@@ -25,10 +25,10 @@ const MaskEditor = () => {
 
     const sessionId = window.location.pathname.split('/').pop();
     console.log('Session ID:', sessionId);
-    
+
     const initializeCanvas = async () => {
       try {
-        // Fetch session data
+        // Fetch session data from the Worker
         console.log('Fetching session data...');
         const sessionUrl = `${WORKER_URL}/api/session/${sessionId}`;
         console.log('Session URL:', sessionUrl);
@@ -45,48 +45,59 @@ const MaskEditor = () => {
         const data = await response.json();
         console.log('Session data:', data);
         
-        // Create Fabric canvas
+        // Create Fabric canvas with dimensions from session data
         const fabricCanvas = new fabric.Canvas(canvasRef.current, {
           isDrawingMode: true,
           width: data.width,
           height: data.height,
           backgroundColor: '#2d3748'
         });
+        console.log('Fabric canvas created with dimensions:', data.width, data.height);
 
-        // Load original image using the correct property from the API response
+        // Load the background image using the URL from the session data
         const imageUrl = data.imageUrl;
         console.log('Loading image from:', imageUrl);
         
-        // IMPORTANT: Add crossOrigin option so images load correctly from a different domain
+        // Load the image with crossOrigin option
         fabric.Image.fromURL(
           imageUrl,
           (img) => {
-            console.log('Image loaded:', img ? 'success' : 'failed');
+            if (img) {
+              console.log('Image loaded: success');
+              // Optionally log image dimensions
+              console.log('Image dimensions:', img.width, img.height);
+            } else {
+              console.error('Image loaded: failed');
+            }
             if (!img) {
-              console.error('Failed to load image');
               setLoading(false);
               return;
             }
             
+            // Scale the image to fit the canvas
             img.set({
               selectable: false,
               evented: false,
               scaleX: fabricCanvas.width / img.width,
               scaleY: fabricCanvas.height / img.height,
             });
-            fabricCanvas.setBackgroundImage(img, fabricCanvas.renderAll.bind(fabricCanvas));
+            // Set as background image and render
+            fabricCanvas.setBackgroundImage(img, () => {
+              fabricCanvas.renderAll();
+              console.log('Canvas rendered with background image.');
+            });
             setLoading(false);
           },
-          { crossOrigin: 'Anonymous' }  // <-- Added option
+          { crossOrigin: 'Anonymous' }
         );
 
-        // Configure brush
+        // Configure brush settings
         const brush = new fabric.PencilBrush(fabricCanvas);
         brush.color = 'rgba(255,255,255,0.5)';
         brush.width = brushSize;
         fabricCanvas.freeDrawingBrush = brush;
 
-        // Set up event listener to record history on every path creation
+        // Record history on path creation
         fabricCanvas.on('path:created', () => {
           addToHistory(fabricCanvas.toJSON());
         });
@@ -105,7 +116,7 @@ const MaskEditor = () => {
 
     initializeCanvas();
 
-    // Clean up on unmount
+    // Cleanup: dispose of canvas on unmount
     return () => {
       if (canvas) {
         canvas.dispose();
@@ -113,7 +124,7 @@ const MaskEditor = () => {
     };
   }, []);
 
-  // History management
+  // History management function
   const addToHistory = (canvasState) => {
     setHistory((prev) => {
       const newHistory = [...prev.slice(0, historyIndex + 1), canvasState];
@@ -147,7 +158,6 @@ const MaskEditor = () => {
   const handleModeChange = (newMode) => {
     setMode(newMode);
     if (!canvas) return;
-
     if (newMode === 'eraser') {
       canvas.freeDrawingBrush.color = 'rgba(0,0,0,0)';
     } else {
@@ -155,35 +165,22 @@ const MaskEditor = () => {
     }
   };
 
-  // Save functionality
+  // Save functionality: sends the canvas mask to the Worker
   const handleSave = async () => {
     if (!canvas) return;
-
     try {
       const sessionId = window.location.pathname.split('/').pop();
-      
-      // Convert canvas to mask
       const maskData = canvas.toDataURL({
         format: 'png',
         quality: 1,
         multiplier: 1,
       });
-
-      // Send to worker
       const response = await fetch(`${WORKER_URL}/api/save-mask`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          sessionId,
-          maskData,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, maskData }),
       });
-
       if (!response.ok) throw new Error('Failed to save mask');
-
-      // Close editor window after saving
       window.close();
     } catch (error) {
       console.error('Error saving mask:', error);
@@ -216,7 +213,8 @@ const MaskEditor = () => {
         ref={containerRef}
         className="flex-1 overflow-auto p-4 flex items-center justify-center"
       >
-        <canvas ref={canvasRef} className="shadow-lg" />
+        {/* Added inline border to help visualize the canvas */}
+        <canvas ref={canvasRef} className="shadow-lg" style={{ border: "1px solid red" }} />
       </div>
     </div>
   );
