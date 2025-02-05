@@ -1,0 +1,13 @@
+name = "mask-editor"
+main = "src/worker.js"
+
+[[routes]]
+pattern = "/api/*"
+script = "src/worker.js"
+
+[build]
+command = "npm run build"
+output_dir = "dist"
+
+[site]
+bucket = "dist"

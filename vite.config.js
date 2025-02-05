@@ -12,7 +12,9 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: process.env.NODE_ENV === 'production' 
+          ? 'https://mask-editor.pages.dev'
+          : 'http://localhost:8080',
         changeOrigin: true,
       },
     },
