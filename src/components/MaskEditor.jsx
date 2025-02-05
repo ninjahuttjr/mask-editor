@@ -1,4 +1,3 @@
-// MaskEditor.jsx
 import React, { useEffect, useState, useRef } from 'react';
 import { fabric } from 'fabric';
 import Toolbar from './Toolbar';
@@ -20,7 +19,6 @@ const MaskEditor = () => {
   const [historyIndex, setHistoryIndex] = useState(-1);
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
-
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -55,30 +53,34 @@ const MaskEditor = () => {
           backgroundColor: '#2d3748'
         });
 
-        // Load original image
-        const imageUrl = `${WORKER_URL}/storage/${data.image_path}`;
+        // Load original image using the correct property from the API response
+        const imageUrl = data.imageUrl;
         console.log('Loading image from:', imageUrl);
         
-        fabric.Image.fromURL(imageUrl, (img) => {
-          console.log('Image loaded:', img ? 'success' : 'failed');
-          if (!img) {
-            console.error('Failed to load image');
-            return;
+        fabric.Image.fromURL(
+          imageUrl,
+          (img) => {
+            console.log('Image loaded:', img ? 'success' : 'failed');
+            if (!img) {
+              console.error('Failed to load image');
+              return;
+            }
+            
+            img.set({
+              selectable: false,
+              evented: false,
+              scaleX: fabricCanvas.width / img.width,
+              scaleY: fabricCanvas.height / img.height,
+            });
+            fabricCanvas.setBackgroundImage(img, fabricCanvas.renderAll.bind(fabricCanvas));
+            setLoading(false);
+          },
+          (err) => {
+            // Error callback
+            console.error('Error loading image:', err);
+            setLoading(false);
           }
-          
-          img.set({
-            selectable: false,
-            evented: false,
-            scaleX: fabricCanvas.width / img.width,
-            scaleY: fabricCanvas.height / img.height
-          });
-          fabricCanvas.setBackgroundImage(img, fabricCanvas.renderAll.bind(fabricCanvas));
-          setLoading(false);
-        }, (err) => {
-          // Error callback
-          console.error('Error loading image:', err);
-          setLoading(false);
-        });
+        );
 
         // Configure brush
         const brush = new fabric.PencilBrush(fabricCanvas);
@@ -86,19 +88,18 @@ const MaskEditor = () => {
         brush.width = brushSize;
         fabricCanvas.freeDrawingBrush = brush;
 
-        // Set up event listeners
+        // Set up event listeners to record history
         fabricCanvas.on('path:created', () => {
           addToHistory(fabricCanvas.toJSON());
         });
 
         setCanvas(fabricCanvas);
         addToHistory(fabricCanvas.toJSON());
-
       } catch (error) {
         console.error('Error initializing editor:', error);
         console.error('Full error details:', {
           message: error.message,
-          stack: error.stack
+          stack: error.stack,
         });
         setLoading(false);
       }
@@ -115,24 +116,24 @@ const MaskEditor = () => {
 
   // History management
   const addToHistory = (canvasState) => {
-    setHistory(prev => {
+    setHistory((prev) => {
       const newHistory = [...prev.slice(0, historyIndex + 1), canvasState];
       if (newHistory.length > 50) newHistory.shift(); // Limit history size
       return newHistory;
     });
-    setHistoryIndex(prev => prev + 1);
+    setHistoryIndex((prev) => prev + 1);
   };
 
   const undo = () => {
     if (historyIndex > 0) {
-      setHistoryIndex(prev => prev - 1);
+      setHistoryIndex((prev) => prev - 1);
       canvas.loadFromJSON(history[historyIndex - 1], canvas.renderAll.bind(canvas));
     }
   };
 
   const redo = () => {
     if (historyIndex < history.length - 1) {
-      setHistoryIndex(prev => prev + 1);
+      setHistoryIndex((prev) => prev + 1);
       canvas.loadFromJSON(history[historyIndex + 1], canvas.renderAll.bind(canvas));
     }
   };
@@ -166,7 +167,7 @@ const MaskEditor = () => {
       const maskData = canvas.toDataURL({
         format: 'png',
         quality: 1,
-        multiplier: 1
+        multiplier: 1,
       });
 
       // Send to worker
@@ -183,9 +184,8 @@ const MaskEditor = () => {
 
       if (!response.ok) throw new Error('Failed to save mask');
 
-      // Close editor window
+      // Close editor window after saving
       window.close();
-
     } catch (error) {
       console.error('Error saving mask:', error);
       alert('Failed to save mask. Please try again.');
@@ -213,7 +213,7 @@ const MaskEditor = () => {
         onRedo={redo}
         onSave={handleSave}
       />
-      <div 
+      <div
         ref={containerRef}
         className="flex-1 overflow-auto p-4 flex items-center justify-center"
       >
