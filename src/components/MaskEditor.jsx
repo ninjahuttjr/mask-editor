@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { fabric } from 'fabric';
 import Toolbar from './Toolbar';
 
-// Add immediate console log
+// Log when the component loads
 console.log('MaskEditor component loaded');
 
 const WORKER_URL = 'https://proud-sky-f006.2qzyhk4jvk.workers.dev';
@@ -57,12 +57,14 @@ const MaskEditor = () => {
         const imageUrl = data.imageUrl;
         console.log('Loading image from:', imageUrl);
         
+        // IMPORTANT: Add crossOrigin option so images load correctly from a different domain
         fabric.Image.fromURL(
           imageUrl,
           (img) => {
             console.log('Image loaded:', img ? 'success' : 'failed');
             if (!img) {
               console.error('Failed to load image');
+              setLoading(false);
               return;
             }
             
@@ -75,11 +77,7 @@ const MaskEditor = () => {
             fabricCanvas.setBackgroundImage(img, fabricCanvas.renderAll.bind(fabricCanvas));
             setLoading(false);
           },
-          (err) => {
-            // Error callback
-            console.error('Error loading image:', err);
-            setLoading(false);
-          }
+          { crossOrigin: 'Anonymous' }  // <-- Added option
         );
 
         // Configure brush
@@ -88,7 +86,7 @@ const MaskEditor = () => {
         brush.width = brushSize;
         fabricCanvas.freeDrawingBrush = brush;
 
-        // Set up event listeners to record history
+        // Set up event listener to record history on every path creation
         fabricCanvas.on('path:created', () => {
           addToHistory(fabricCanvas.toJSON());
         });
@@ -107,6 +105,7 @@ const MaskEditor = () => {
 
     initializeCanvas();
 
+    // Clean up on unmount
     return () => {
       if (canvas) {
         canvas.dispose();
@@ -138,7 +137,7 @@ const MaskEditor = () => {
     }
   };
 
-  // Mode and brush size management
+  // Update brush width when brushSize changes
   useEffect(() => {
     if (canvas) {
       canvas.freeDrawingBrush.width = brushSize;
@@ -213,7 +212,7 @@ const MaskEditor = () => {
         onRedo={redo}
         onSave={handleSave}
       />
-      <div
+      <div 
         ref={containerRef}
         className="flex-1 overflow-auto p-4 flex items-center justify-center"
       >
