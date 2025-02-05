@@ -28,7 +28,6 @@ const MaskEditor = () => {
 
     const initializeCanvas = async () => {
       try {
-        // Fetch session data from the Worker
         console.log('Fetching session data...');
         const sessionUrl = `${WORKER_URL}/api/session/${sessionId}`;
         console.log('Session URL:', sessionUrl);
@@ -44,8 +43,8 @@ const MaskEditor = () => {
         
         const data = await response.json();
         console.log('Session data:', data);
-        
-        // Create Fabric canvas with dimensions from session data
+
+        // Create Fabric canvas with dimensions from session data.
         const fabricCanvas = new fabric.Canvas(canvasRef.current, {
           isDrawingMode: true,
           width: data.width,
@@ -54,17 +53,27 @@ const MaskEditor = () => {
         });
         console.log('Fabric canvas created with dimensions:', data.width, data.height);
 
-        // Load the background image using the URL from the session data
+        // Draw a test rectangle to verify the canvas is visible.
+        const testRect = new fabric.Rect({
+          left: 10,
+          top: 10,
+          fill: 'red',
+          width: 50,
+          height: 50
+        });
+        fabricCanvas.add(testRect);
+        console.log('Test rectangle added to canvas.');
+
+        // Load the background image using the URL from the session data.
         const imageUrl = data.imageUrl;
         console.log('Loading image from:', imageUrl);
         
-        // Load the image with crossOrigin option
+        // Load the image with crossOrigin option.
         fabric.Image.fromURL(
           imageUrl,
           (img) => {
             if (img) {
               console.log('Image loaded: success');
-              // Optionally log image dimensions
               console.log('Image dimensions:', img.width, img.height);
             } else {
               console.error('Image loaded: failed');
@@ -73,15 +82,12 @@ const MaskEditor = () => {
               setLoading(false);
               return;
             }
-            
-            // Scale the image to fit the canvas
             img.set({
               selectable: false,
               evented: false,
               scaleX: fabricCanvas.width / img.width,
               scaleY: fabricCanvas.height / img.height,
             });
-            // Set as background image and render
             fabricCanvas.setBackgroundImage(img, () => {
               fabricCanvas.renderAll();
               console.log('Canvas rendered with background image.');
@@ -91,13 +97,13 @@ const MaskEditor = () => {
           { crossOrigin: 'Anonymous' }
         );
 
-        // Configure brush settings
+        // Configure brush settings.
         const brush = new fabric.PencilBrush(fabricCanvas);
         brush.color = 'rgba(255,255,255,0.5)';
         brush.width = brushSize;
         fabricCanvas.freeDrawingBrush = brush;
 
-        // Record history on path creation
+        // Record history on path creation.
         fabricCanvas.on('path:created', () => {
           addToHistory(fabricCanvas.toJSON());
         });
@@ -116,7 +122,7 @@ const MaskEditor = () => {
 
     initializeCanvas();
 
-    // Cleanup: dispose of canvas on unmount
+    // Cleanup: Dispose the canvas on unmount.
     return () => {
       if (canvas) {
         canvas.dispose();
@@ -124,11 +130,11 @@ const MaskEditor = () => {
     };
   }, []);
 
-  // History management function
+  // History management.
   const addToHistory = (canvasState) => {
     setHistory((prev) => {
       const newHistory = [...prev.slice(0, historyIndex + 1), canvasState];
-      if (newHistory.length > 50) newHistory.shift(); // Limit history size
+      if (newHistory.length > 50) newHistory.shift(); // Limit history size.
       return newHistory;
     });
     setHistoryIndex((prev) => prev + 1);
@@ -148,7 +154,7 @@ const MaskEditor = () => {
     }
   };
 
-  // Update brush width when brushSize changes
+  // Update brush width when brushSize changes.
   useEffect(() => {
     if (canvas) {
       canvas.freeDrawingBrush.width = brushSize;
@@ -165,7 +171,7 @@ const MaskEditor = () => {
     }
   };
 
-  // Save functionality: sends the canvas mask to the Worker
+  // Save functionality.
   const handleSave = async () => {
     if (!canvas) return;
     try {
@@ -213,7 +219,7 @@ const MaskEditor = () => {
         ref={containerRef}
         className="flex-1 overflow-auto p-4 flex items-center justify-center"
       >
-        {/* Added inline border to help visualize the canvas */}
+        {/* The canvas has an inline red border for debugging */}
         <canvas ref={canvasRef} className="shadow-lg" style={{ border: "1px solid red" }} />
       </div>
     </div>
