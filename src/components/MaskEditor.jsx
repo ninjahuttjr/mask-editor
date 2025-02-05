@@ -15,18 +15,30 @@ const MaskEditor = () => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
 
-  // Initialize canvas and load session data
   useEffect(() => {
     if (!canvasRef.current) return;
 
     const sessionId = window.location.pathname.split('/').pop();
+    console.log('Session ID:', sessionId);
     
     const initializeCanvas = async () => {
       try {
         // Fetch session data
-        const response = await fetch(`${WORKER_URL}/api/session/${sessionId}`);
-        if (!response.ok) throw new Error('Failed to fetch session data');
+        console.log('Fetching session data...');
+        const sessionUrl = `${WORKER_URL}/api/session/${sessionId}`;
+        console.log('Session URL:', sessionUrl);
+        
+        const response = await fetch(sessionUrl);
+        console.log('Session response status:', response.status);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Session fetch error:', errorText);
+          throw new Error('Failed to fetch session data');
+        }
+        
         const data = await response.json();
+        console.log('Session data:', data);
         
         // Create Fabric canvas
         const fabricCanvas = new fabric.Canvas(canvasRef.current, {
@@ -41,6 +53,12 @@ const MaskEditor = () => {
         console.log('Loading image from:', imageUrl);
         
         fabric.Image.fromURL(imageUrl, (img) => {
+          console.log('Image loaded:', img ? 'success' : 'failed');
+          if (!img) {
+            console.error('Failed to load image');
+            return;
+          }
+          
           img.set({
             selectable: false,
             evented: false,
@@ -48,6 +66,10 @@ const MaskEditor = () => {
             scaleY: fabricCanvas.height / img.height
           });
           fabricCanvas.setBackgroundImage(img, fabricCanvas.renderAll.bind(fabricCanvas));
+          setLoading(false);
+        }, (err) => {
+          // Error callback
+          console.error('Error loading image:', err);
           setLoading(false);
         });
 
@@ -67,6 +89,10 @@ const MaskEditor = () => {
 
       } catch (error) {
         console.error('Error initializing editor:', error);
+        console.error('Full error details:', {
+          message: error.message,
+          stack: error.stack
+        });
         setLoading(false);
       }
     };
