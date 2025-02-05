@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.canvas-container {
+  margin: 0 auto;
+  background: #2d3748;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.canvas-container canvas {
+  border-radius: 0.5rem;
+}
