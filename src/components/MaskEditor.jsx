@@ -3,6 +3,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { fabric } from 'fabric';
 import Toolbar from './Toolbar';
 
+const WORKER_URL = 'https://proud-sky-f006.2qzyhk4jvk.workers.dev';
+
 const MaskEditor = () => {
   const [canvas, setCanvas] = useState(null);
   const [mode, setMode] = useState('brush');
@@ -22,7 +24,7 @@ const MaskEditor = () => {
     const initializeCanvas = async () => {
       try {
         // Fetch session data
-        const response = await fetch(`/api/session/${sessionId}`);
+        const response = await fetch(`${WORKER_URL}/api/session/${sessionId}`);
         if (!response.ok) throw new Error('Failed to fetch session data');
         const data = await response.json();
         
@@ -35,7 +37,10 @@ const MaskEditor = () => {
         });
 
         // Load original image
-        fabric.Image.fromURL(data.imageUrl, (img) => {
+        const imageUrl = `${WORKER_URL}/storage/${data.image_path}`;
+        console.log('Loading image from:', imageUrl);
+        
+        fabric.Image.fromURL(imageUrl, (img) => {
           img.set({
             selectable: false,
             evented: false,
@@ -131,8 +136,8 @@ const MaskEditor = () => {
         multiplier: 1
       });
 
-      // Send to backend
-      const response = await fetch('/api/save-mask', {
+      // Send to worker
+      const response = await fetch(`${WORKER_URL}/api/save-mask`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
