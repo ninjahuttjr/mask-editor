@@ -3,9 +3,15 @@ import React, { useEffect, useState, useRef } from 'react';
 import { fabric } from 'fabric';
 import Toolbar from './Toolbar';
 
+// Add immediate console log
+console.log('MaskEditor component loaded');
+
 const WORKER_URL = 'https://proud-sky-f006.2qzyhk4jvk.workers.dev';
+console.log('Worker URL:', WORKER_URL);
 
 const MaskEditor = () => {
+  console.log('MaskEditor component rendering');
+
   const [canvas, setCanvas] = useState(null);
   const [mode, setMode] = useState('brush');
   const [brushSize, setBrushSize] = useState(20);
@@ -14,6 +20,7 @@ const MaskEditor = () => {
   const [historyIndex, setHistoryIndex] = useState(-1);
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
+
 
   useEffect(() => {
     if (!canvasRef.current) return;
