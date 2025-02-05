@@ -1,13 +1,18 @@
-name = "mask-editor"
+name = "mask-editor-api"
 main = "src/worker.js"
+compatibility_date = "2024-02-04"
 
+# KV Namespace binding
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "f1a080332fe54c74b52efa1ca6194415"
+
+# R2 bucket binding
+[[r2_buckets]]
+binding = "IMAGE_BUCKET"
+bucket_name = "mask-editor-images"
+
+# Routes for API endpoints
 [[routes]]
 pattern = "/api/*"
 script = "src/worker.js"
-
-[build]
-command = "npm run build"
-output_dir = "dist"
-
-[site]
-bucket = "dist"
