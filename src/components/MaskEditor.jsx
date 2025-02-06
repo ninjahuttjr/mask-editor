@@ -41,6 +41,25 @@ const MaskEditor = () => {
     });
   };
 
+  // Calculate scaled dimensions to fit within max size while maintaining aspect ratio
+  const calculateScaledDimensions = (width, height, maxSize = 512) => {
+    const aspectRatio = width / height;
+    let newWidth = width;
+    let newHeight = height;
+
+    if (width > maxSize || height > maxSize) {
+      if (width > height) {
+        newWidth = maxSize;
+        newHeight = Math.round(maxSize / aspectRatio);
+      } else {
+        newHeight = maxSize;
+        newWidth = Math.round(maxSize * aspectRatio);
+      }
+    }
+
+    return { width: newWidth, height: newHeight };
+  };
+
   // First effect: Fetch session data and validate image
   useEffect(() => {
     const fetchSessionData = async () => {
@@ -61,11 +80,14 @@ const MaskEditor = () => {
         const imageDimensions = await getImageDimensions(data.imageUrl);
         console.log('Image validation complete:', imageDimensions);
 
-        // Use actual image dimensions if no dimensions provided
-        setDimensions({
-          width: data.width || imageDimensions.width,
-          height: data.height || imageDimensions.height
-        });
+        // Calculate appropriate canvas dimensions
+        const scaledDimensions = calculateScaledDimensions(
+          imageDimensions.width,
+          imageDimensions.height
+        );
+        console.log('Scaled dimensions:', scaledDimensions);
+
+        setDimensions(scaledDimensions);
         setSessionData(data);
       } catch (error) {
         console.error('Session initialization failed:', error);
@@ -86,10 +108,6 @@ const MaskEditor = () => {
         containerDimensions: containerRef.current ? {
           width: containerRef.current.offsetWidth,
           height: containerRef.current.offsetHeight,
-          clientWidth: containerRef.current.clientWidth,
-          clientHeight: containerRef.current.clientHeight,
-          scrollWidth: containerRef.current.scrollWidth,
-          scrollHeight: containerRef.current.scrollHeight
         } : null,
         currentDimensions: dimensions
       });
@@ -134,10 +152,7 @@ const MaskEditor = () => {
           backgroundColor: '#2d3748'
         });
 
-        console.log('Fabric canvas initialized with dimensions:', {
-          width: fabricCanvas.width,
-          height: fabricCanvas.height
-        });
+        console.log('Fabric canvas initialized');
 
         // Configure brush settings
         const brush = new fabric.PencilBrush(fabricCanvas);
@@ -145,8 +160,7 @@ const MaskEditor = () => {
         brush.width = brushSize;
         fabricCanvas.freeDrawingBrush = brush;
 
-        // Load the image
-        console.log('Loading image from:', sessionData.imageUrl);
+        // Load and scale the image
         await new Promise((resolve, reject) => {
           fabric.Image.fromURL(
             sessionData.imageUrl,
@@ -155,13 +169,10 @@ const MaskEditor = () => {
                 reject(new Error('Failed to load image'));
                 return;
               }
-              console.log('Image loaded with dimensions:', {
-                width: img.width,
-                height: img.height
-              });
 
-              const scaleX = fabricCanvas.width / img.width;
-              const scaleY = fabricCanvas.height / img.height;
+              // Set image to fill canvas while maintaining aspect ratio
+              const scaleX = dimensions.width / img.width;
+              const scaleY = dimensions.height / img.height;
               const scale = Math.min(scaleX, scaleY);
               
               img.set({
@@ -169,8 +180,8 @@ const MaskEditor = () => {
                 scaleY: scale,
                 selectable: false,
                 evented: false,
-                left: (fabricCanvas.width - (img.width * scale)) / 2,
-                top: (fabricCanvas.height - (img.height * scale)) / 2
+                left: (dimensions.width - (img.width * scale)) / 2,
+                top: (dimensions.height - (img.height * scale)) / 2
               });
 
               fabricCanvas.setBackgroundImage(img, fabricCanvas.renderAll.bind(fabricCanvas));
@@ -180,12 +191,7 @@ const MaskEditor = () => {
           );
         });
 
-        fabricCanvas.on('path:created', () => {
-          addToHistory(fabricCanvas.toJSON(['backgroundImage']));
-        });
-
         setCanvas(fabricCanvas);
-        addToHistory(fabricCanvas.toJSON(['backgroundImage']));
         setLoading(false);
 
       } catch (error) {
