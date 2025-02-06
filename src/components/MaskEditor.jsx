@@ -20,54 +20,6 @@ const MaskEditor = () => {
   const sessionId = window.location.pathname.split('/').pop();
   const [sessionData, setSessionData] = useState(null);
   const [dimensions, setDimensions] = useState({ width: 512, height: 512 });
-  const [containerReady, setContainerReady] = useState(false);
-
-  // Check container mounting
-  useLayoutEffect(() => {
-    if (containerRef.current) {
-      console.log('Container mounted:', containerRef.current);
-      setContainerReady(true);
-    }
-  }, []);
-
-  // Utility function to get image dimensions
-  const getImageDimensions = (url) => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        console.log('Actual image dimensions:', {
-          width: img.naturalWidth,
-          height: img.naturalHeight
-        });
-        resolve({
-          width: img.naturalWidth,
-          height: img.naturalHeight
-        });
-      };
-      img.onerror = () => reject(new Error('Failed to load image'));
-      img.src = url;
-      img.crossOrigin = 'anonymous';
-    });
-  };
-
-  // Calculate scaled dimensions to fit within max size while maintaining aspect ratio
-  const calculateScaledDimensions = (width, height, maxSize = 512) => {
-    const aspectRatio = width / height;
-    let newWidth = width;
-    let newHeight = height;
-
-    if (width > maxSize || height > maxSize) {
-      if (width > height) {
-        newWidth = maxSize;
-        newHeight = Math.round(maxSize / aspectRatio);
-      } else {
-        newHeight = maxSize;
-        newWidth = Math.round(maxSize * aspectRatio);
-      }
-    }
-
-    return { width: newWidth, height: newHeight };
-  };
 
   // First effect: Fetch session data
   useEffect(() => {
@@ -102,101 +54,130 @@ const MaskEditor = () => {
     fetchSessionData();
   }, [sessionId]);
 
+  // Calculate scaled dimensions to fit within max size while maintaining aspect ratio
+  const calculateScaledDimensions = (width, height, maxSize = 512) => {
+    const aspectRatio = width / height;
+    let newWidth, newHeight;
+
+    if (height > width) {
+      // Portrait orientation
+      newHeight = maxSize;
+      newWidth = Math.round(maxSize * aspectRatio);
+    } else {
+      // Landscape orientation
+      newWidth = maxSize;
+      newHeight = Math.round(maxSize / aspectRatio);
+    }
+
+    console.log('Calculated dimensions:', { newWidth, newHeight, aspectRatio });
+    return { width: newWidth, height: newHeight };
+  };
+
   // Second effect: Initialize canvas
   useEffect(() => {
-    if (!sessionData || !containerReady || !containerRef.current) {
+    if (!sessionData || !containerRef.current) {
       console.log('Waiting for initialization...', {
         hasSessionData: !!sessionData,
-        isContainerReady: containerReady,
-        hasContainer: !!containerRef.current,
-        containerElement: containerRef.current
+        containerRef: containerRef.current
       });
       return;
     }
 
-    console.log('Starting canvas initialization');
-    let fabricCanvas = null;
+    const container = containerRef.current;
+    console.log('Initializing canvas with dimensions:', dimensions);
 
-    const initializeCanvas = async () => {
-      try {
-        // Clear existing content
-        containerRef.current.innerHTML = '';
+    // Create canvas element
+    const canvasEl = document.createElement('canvas');
+    canvasEl.width = dimensions.width;
+    canvasEl.height = dimensions.height;
+    canvasEl.style.width = `${dimensions.width}px`;
+    canvasEl.style.height = `${dimensions.height}px`;
+    canvasEl.className = 'rounded-lg';
 
-        // Create canvas element
-        const canvasEl = document.createElement('canvas');
-        canvasEl.width = dimensions.width;
-        canvasEl.height = dimensions.height;
-        canvasEl.className = 'rounded-lg';
+    // Clear container and append canvas
+    container.innerHTML = '';
+    container.appendChild(canvasEl);
+
+    // Initialize Fabric canvas
+    const fabricCanvas = new fabric.Canvas(canvasEl, {
+      isDrawingMode: true,
+      width: dimensions.width,
+      height: dimensions.height,
+      backgroundColor: '#2d3748'
+    });
+
+    console.log('Fabric canvas initialized:', fabricCanvas);
+
+    // Configure brush
+    const brush = new fabric.PencilBrush(fabricCanvas);
+    brush.color = 'rgba(255,255,255,0.5)';
+    brush.width = brushSize;
+    fabricCanvas.freeDrawingBrush = brush;
+
+    // Load image
+    fabric.Image.fromURL(
+      sessionData.imageUrl,
+      (img) => {
+        if (!img) {
+          console.error('Failed to load image');
+          return;
+        }
+
+        console.log('Image loaded:', {
+          imgWidth: img.width,
+          imgHeight: img.height,
+          canvasWidth: dimensions.width,
+          canvasHeight: dimensions.height
+        });
+
+        const scaleX = dimensions.width / img.width;
+        const scaleY = dimensions.height / img.height;
+        const scale = Math.min(scaleX, scaleY);
         
-        // Append canvas directly
-        containerRef.current.appendChild(canvasEl);
-
-        console.log('Canvas element created:', canvasEl);
-
-        // Initialize Fabric canvas
-        fabricCanvas = new fabric.Canvas(canvasEl, {
-          isDrawingMode: true,
-          width: dimensions.width,
-          height: dimensions.height,
-          backgroundColor: '#2d3748'
+        img.set({
+          scaleX: scale,
+          scaleY: scale,
+          selectable: false,
+          evented: false,
+          left: (dimensions.width - (img.width * scale)) / 2,
+          top: (dimensions.height - (img.height * scale)) / 2
         });
 
-        console.log('Fabric canvas initialized');
-
-        // Configure brush
-        const brush = new fabric.PencilBrush(fabricCanvas);
-        brush.color = 'rgba(255,255,255,0.5)';
-        brush.width = brushSize;
-        fabricCanvas.freeDrawingBrush = brush;
-
-        // Load image
-        await new Promise((resolve, reject) => {
-          fabric.Image.fromURL(
-            sessionData.imageUrl,
-            (img) => {
-              if (!img) {
-                reject(new Error('Failed to load image'));
-                return;
-              }
-
-              const scaleX = dimensions.width / img.width;
-              const scaleY = dimensions.height / img.height;
-              const scale = Math.min(scaleX, scaleY);
-              
-              img.set({
-                scaleX: scale,
-                scaleY: scale,
-                selectable: false,
-                evented: false,
-                left: (dimensions.width - (img.width * scale)) / 2,
-                top: (dimensions.height - (img.height * scale)) / 2
-              });
-
-              fabricCanvas.setBackgroundImage(img, fabricCanvas.renderAll.bind(fabricCanvas));
-              resolve();
-            },
-            { crossOrigin: 'anonymous' }
-          );
+        fabricCanvas.setBackgroundImage(img, () => {
+          fabricCanvas.renderAll();
+          console.log('Background image set');
+          setLoading(false);
         });
+      },
+      { crossOrigin: 'anonymous' }
+    );
 
-        setCanvas(fabricCanvas);
-        setLoading(false);
-
-      } catch (error) {
-        console.error('Canvas initialization failed:', error);
-        setError(error.message);
-        setLoading(false);
-      }
-    };
-
-    initializeCanvas();
+    setCanvas(fabricCanvas);
 
     return () => {
-      if (fabricCanvas) {
-        fabricCanvas.dispose();
-      }
+      fabricCanvas.dispose();
     };
-  }, [sessionData, containerReady, dimensions, brushSize]);
+  }, [sessionData, dimensions, brushSize]);
+
+  // Utility function to get image dimensions
+  const getImageDimensions = (url) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        console.log('Actual image dimensions:', {
+          width: img.naturalWidth,
+          height: img.naturalHeight
+        });
+        resolve({
+          width: img.naturalWidth,
+          height: img.naturalHeight
+        });
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = url;
+      img.crossOrigin = 'anonymous';
+    });
+  };
 
   // History management.
   const addToHistory = (canvasState) => {
@@ -295,10 +276,10 @@ const MaskEditor = () => {
         onRedo={redo}
         onSave={handleSave}
       />
-      <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
+      <div className="flex-1 p-4 flex items-center justify-center">
         <div 
           ref={containerRef}
-          className="relative bg-gray-800 rounded-lg"
+          className="bg-gray-800 rounded-lg shadow-lg overflow-hidden"
           style={{ 
             width: `${dimensions.width}px`,
             height: `${dimensions.height}px`
@@ -307,7 +288,7 @@ const MaskEditor = () => {
       </div>
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75 z-50">
-          <div className="text-white">Loading editor...</div>
+          <div className="text-white text-lg">Loading editor...</div>
         </div>
       )}
     </div>
