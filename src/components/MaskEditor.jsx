@@ -16,6 +16,7 @@ const MaskEditor = () => {
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const containerRef = useRef(null);
+  const canvasRef = useRef(null);
   const [error, setError] = useState(null);
   const sessionId = window.location.pathname.split('/').pop();
   const [sessionData, setSessionData] = useState(null);
@@ -73,30 +74,23 @@ const MaskEditor = () => {
     return { width: newWidth, height: newHeight };
   };
 
-  // Second effect: Initialize canvas
-  useEffect(() => {
-    if (!sessionData || !containerRef.current) {
-      console.log('Waiting for initialization...', {
-        hasSessionData: !!sessionData,
-        containerRef: containerRef.current
-      });
-      return;
-    }
+  // Use layout effect to initialize canvas after DOM updates
+  useLayoutEffect(() => {
+    if (!sessionData || !containerRef.current) return;
 
-    const container = containerRef.current;
-    console.log('Initializing canvas with dimensions:', dimensions);
-
-    // Create canvas element
+    console.log('Container mounted, initializing canvas');
+    
+    // Create and mount canvas element
     const canvasEl = document.createElement('canvas');
     canvasEl.width = dimensions.width;
     canvasEl.height = dimensions.height;
     canvasEl.style.width = `${dimensions.width}px`;
     canvasEl.style.height = `${dimensions.height}px`;
     canvasEl.className = 'rounded-lg';
-
-    // Clear container and append canvas
-    container.innerHTML = '';
-    container.appendChild(canvasEl);
+    
+    containerRef.current.innerHTML = '';
+    containerRef.current.appendChild(canvasEl);
+    canvasRef.current = canvasEl;
 
     // Initialize Fabric canvas
     const fabricCanvas = new fabric.Canvas(canvasEl, {
@@ -105,8 +99,6 @@ const MaskEditor = () => {
       height: dimensions.height,
       backgroundColor: '#2d3748'
     });
-
-    console.log('Fabric canvas initialized:', fabricCanvas);
 
     // Configure brush
     const brush = new fabric.PencilBrush(fabricCanvas);
