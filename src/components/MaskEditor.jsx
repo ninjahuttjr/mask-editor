@@ -21,7 +21,27 @@ const MaskEditor = () => {
   const [sessionData, setSessionData] = useState(null);
   const [dimensions, setDimensions] = useState({ width: 512, height: 512 });
 
-  // First effect: Fetch session data
+  // Utility function to get image dimensions
+  const getImageDimensions = (url) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        console.log('Actual image dimensions:', {
+          width: img.naturalWidth,
+          height: img.naturalHeight
+        });
+        resolve({
+          width: img.naturalWidth,
+          height: img.naturalHeight
+        });
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = url;
+      img.crossOrigin = 'anonymous';
+    });
+  };
+
+  // First effect: Fetch session data and validate image
   useEffect(() => {
     const fetchSessionData = async () => {
       try {
@@ -35,13 +55,20 @@ const MaskEditor = () => {
         
         const data = await response.json();
         console.log('Session data received:', data);
-        setSessionData(data);
+
+        // Validate image dimensions
+        console.log('Validating image dimensions...');
+        const imageDimensions = await getImageDimensions(data.imageUrl);
+        console.log('Image validation complete:', imageDimensions);
+
+        // Use actual image dimensions if no dimensions provided
         setDimensions({
-          width: data.width || 512,
-          height: data.height || 512
+          width: data.width || imageDimensions.width,
+          height: data.height || imageDimensions.height
         });
+        setSessionData(data);
       } catch (error) {
-        console.error('Session fetch failed:', error);
+        console.error('Session initialization failed:', error);
         setError(error.message);
         setLoading(false);
       }
@@ -58,13 +85,18 @@ const MaskEditor = () => {
         hasContainer: !!containerRef.current,
         containerDimensions: containerRef.current ? {
           width: containerRef.current.offsetWidth,
-          height: containerRef.current.offsetHeight
-        } : null
+          height: containerRef.current.offsetHeight,
+          clientWidth: containerRef.current.clientWidth,
+          clientHeight: containerRef.current.clientHeight,
+          scrollWidth: containerRef.current.scrollWidth,
+          scrollHeight: containerRef.current.scrollHeight
+        } : null,
+        currentDimensions: dimensions
       });
       return;
     }
 
-    console.log('Starting canvas initialization...');
+    console.log('Starting canvas initialization with dimensions:', dimensions);
     let fabricCanvas = null;
 
     const initializeCanvas = async () => {
@@ -83,7 +115,16 @@ const MaskEditor = () => {
         containerRef.current.innerHTML = '';
         containerRef.current.appendChild(wrapper);
 
-        console.log('Canvas element created with dimensions:', dimensions);
+        console.log('Canvas element created with dimensions:', {
+          wrapper: {
+            width: wrapper.offsetWidth,
+            height: wrapper.offsetHeight
+          },
+          canvas: {
+            width: canvasEl.width,
+            height: canvasEl.height
+          }
+        });
 
         // Initialize Fabric canvas
         fabricCanvas = new fabric.Canvas(canvasEl, {
@@ -93,7 +134,10 @@ const MaskEditor = () => {
           backgroundColor: '#2d3748'
         });
 
-        console.log('Fabric canvas initialized');
+        console.log('Fabric canvas initialized with dimensions:', {
+          width: fabricCanvas.width,
+          height: fabricCanvas.height
+        });
 
         // Configure brush settings
         const brush = new fabric.PencilBrush(fabricCanvas);
@@ -111,8 +155,11 @@ const MaskEditor = () => {
                 reject(new Error('Failed to load image'));
                 return;
               }
+              console.log('Image loaded with dimensions:', {
+                width: img.width,
+                height: img.height
+              });
 
-              console.log('Image loaded successfully');
               const scaleX = fabricCanvas.width / img.width;
               const scaleY = fabricCanvas.height / img.height;
               const scale = Math.min(scaleX, scaleY);
