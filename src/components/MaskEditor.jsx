@@ -126,7 +126,6 @@ const MaskEditor = () => {
     containerRef.current.appendChild(canvasEl);
     canvasRef.current = canvasEl;
 
-    // Initialize Fabric canvas
     const fabricCanvas = new fabric.Canvas(canvasEl, {
       isDrawingMode: true,
       width: dimensions.width,
@@ -136,15 +135,33 @@ const MaskEditor = () => {
 
     // Configure brush with 100% opacity
     const brush = new fabric.PencilBrush(fabricCanvas);
-    brush.color = mode === 'eraser' ? '#2d3748' : '#ffffff'; // Solid white for mask, background color for eraser
+    brush.color = mode === 'eraser' ? '#2d3748' : '#ffffff';
     brush.width = brushSize;
+    brush.opacity = 1; // Force 100% opacity
     fabricCanvas.freeDrawingBrush = brush;
 
-    // Add history tracking
-    fabricCanvas.on('path:created', () => {
+    // Ensure paths are created with full opacity
+    fabricCanvas.on('path:created', (e) => {
+      const path = e.path;
+      path.set({
+        opacity: 1,
+        strokeWidth: brushSize,
+        stroke: mode === 'eraser' ? '#2d3748' : '#ffffff'
+      });
+      fabricCanvas.renderAll();
       const canvasState = JSON.stringify(fabricCanvas.toJSON());
       addToHistory(canvasState);
     });
+
+    // Handle undo/redo state
+    const handleHistoryChange = () => {
+      const canvasState = JSON.stringify(fabricCanvas.toJSON());
+      addToHistory(canvasState);
+    };
+
+    fabricCanvas.on('object:added', handleHistoryChange);
+    fabricCanvas.on('object:modified', handleHistoryChange);
+    fabricCanvas.on('object:removed', handleHistoryChange);
 
     // Load image
     fabric.Image.fromURL(
@@ -156,13 +173,6 @@ const MaskEditor = () => {
           setLoading(false);
           return;
         }
-
-        console.log('Image loaded:', {
-          imgWidth: img.width,
-          imgHeight: img.height,
-          canvasWidth: dimensions.width,
-          canvasHeight: dimensions.height
-        });
 
         const scaleX = dimensions.width / img.width;
         const scaleY = dimensions.height / img.height;
@@ -258,6 +268,8 @@ const MaskEditor = () => {
     if (canvas) {
       canvas.isDrawingMode = true;
       canvas.freeDrawingBrush.color = newMode === 'eraser' ? '#2d3748' : '#ffffff';
+      canvas.freeDrawingBrush.opacity = 1;
+      canvas.renderAll();
     }
   };
 
