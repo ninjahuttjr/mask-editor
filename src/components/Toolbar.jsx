@@ -11,8 +11,20 @@ const Toolbar = ({
   onUndo,
   onRedo,
   onSave,
-  isSaving
+  isSaving,
+  maskUrl,
+  showSaveSuccess
 }) => {
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(maskUrl);
+      alert('Mask URL copied to clipboard!');
+    } catch (err) {
+      console.error('Failed to copy:', err);
+      alert('Failed to copy URL');
+    }
+  };
+
   return (
     <div className="flex items-center gap-4 p-4 bg-gray-800">
       <button
@@ -60,17 +72,34 @@ const Toolbar = ({
 
       <div className="flex-grow"></div>
 
-      <button
-        onClick={onSave}
-        disabled={isSaving}
-        className={`px-4 py-2 rounded-lg ${
-          isSaving 
-            ? 'bg-gray-500 cursor-not-allowed' 
-            : 'bg-green-600 hover:bg-green-700'
-        } text-white`}
-      >
-        {isSaving ? 'Saving...' : 'Save'}
-      </button>
+      {showSaveSuccess && maskUrl ? (
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={maskUrl}
+            readOnly
+            className="bg-gray-700 text-white px-3 py-2 rounded-lg w-96"
+          />
+          <button
+            onClick={copyToClipboard}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+          >
+            Copy URL
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={onSave}
+          disabled={isSaving}
+          className={`px-4 py-2 rounded-lg ${
+            isSaving 
+              ? 'bg-gray-500 cursor-not-allowed' 
+              : 'bg-green-600 hover:bg-green-700'
+          } text-white`}
+        >
+          {isSaving ? 'Saving...' : 'Save'}
+        </button>
+      )}
     </div>
   );
 };

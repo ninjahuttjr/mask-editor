@@ -63,21 +63,12 @@ function generateUUID() {
   };
   
   async function getImageDimensions(imageBuffer) {
-    const view = new DataView(imageBuffer);
-    
-    // Verify PNG signature
-    const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
-    for (let i = 0; i < 8; i++) {
-      if (view.getUint8(i) !== pngSignature[i]) {
-        throw new Error('Invalid PNG format');
-      }
-    }
-    
-    // Width is at offset 16, height at offset 20
-    const width = view.getUint32(16);
-    const height = view.getUint32(20);
-    
-    return { width, height };
+    const imageBlob = new Blob([imageBuffer], { type: 'image/png' });
+    const imageBitmap = await createImageBitmap(imageBlob);
+    return {
+      width: imageBitmap.width,
+      height: imageBitmap.height
+    };
   }
   
   async function handleStartSession(request, env, corsHeaders) {

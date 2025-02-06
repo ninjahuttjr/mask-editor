@@ -414,6 +414,8 @@ const MaskEditor = () => {
         onRedo={redo}
         onSave={handleSave}
         isSaving={isSaving}
+        maskUrl={maskUrl}
+        showSaveSuccess={showSaveSuccess}
       />
       <div className="flex-1 p-4 flex items-center justify-center">
         <div 
