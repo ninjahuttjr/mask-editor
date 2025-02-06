@@ -19,55 +19,62 @@ const MaskEditor = () => {
   const containerRef = useRef(null);
   const [error, setError] = useState(null);
   const sessionId = window.location.pathname.split('/').pop();
+  const [sessionData, setSessionData] = useState(null);
   const [dimensions, setDimensions] = useState({ width: 512, height: 512 });
 
+  // First effect: Fetch session data
   useEffect(() => {
-    let fabricCanvas = null;
-
-    const initializeCanvas = async () => {
+    const fetchSessionData = async () => {
       try {
-        console.log('Initializing editor with session:', sessionId);
-        
-        // Fetch session data
+        console.log('Fetching session data for:', sessionId);
         const response = await fetch(`${WORKER_URL}/api/session/${sessionId}`);
-        console.log('Session response status:', response.status);
         
         if (!response.ok) {
           const errorText = await response.text();
-          console.error('Session fetch error:', errorText);
           throw new Error(`Failed to fetch session: ${errorText}`);
         }
         
         const data = await response.json();
-        console.log('Session data:', data);
-
-        // Set dimensions from session data
+        console.log('Session data received:', data);
+        setSessionData(data);
         setDimensions({
           width: data.width || 512,
           height: data.height || 512
         });
+      } catch (error) {
+        console.error('Session fetch failed:', error);
+        setError(error.message);
+        setLoading(false);
+      }
+    };
 
-        // Wait for the next render cycle
-        await new Promise(resolve => setTimeout(resolve, 100));
+    fetchSessionData();
+  }, [sessionId]);
 
-        console.log('Canvas ref:', canvasRef.current);
-        if (!canvasRef.current) {
-          throw new Error('Canvas element not found');
-        }
+  // Second effect: Initialize canvas after session data is loaded and canvas is mounted
+  useEffect(() => {
+    if (!sessionData || !canvasRef.current) {
+      console.log('Waiting for canvas element and session data...', {
+        hasSessionData: !!sessionData,
+        hasCanvasRef: !!canvasRef.current
+      });
+      return;
+    }
 
-        // Initialize the canvas element
-        const canvasEl = canvasRef.current;
-        console.log('Initializing canvas with dimensions:', dimensions);
-        
+    console.log('Initializing canvas with dimensions:', dimensions);
+    let fabricCanvas = null;
+
+    const initializeCanvas = async () => {
+      try {
         // Initialize Fabric canvas
-        fabricCanvas = new fabric.Canvas(canvasEl, {
+        fabricCanvas = new fabric.Canvas(canvasRef.current, {
           isDrawingMode: true,
           width: dimensions.width,
           height: dimensions.height,
           backgroundColor: '#2d3748'
         });
 
-        console.log('Fabric canvas initialized:', fabricCanvas);
+        console.log('Fabric canvas initialized');
 
         // Configure brush settings
         const brush = new fabric.PencilBrush(fabricCanvas);
@@ -76,10 +83,10 @@ const MaskEditor = () => {
         fabricCanvas.freeDrawingBrush = brush;
 
         // Load the image
-        console.log('Loading image from:', data.imageUrl);
+        console.log('Loading image from:', sessionData.imageUrl);
         await new Promise((resolve, reject) => {
           fabric.Image.fromURL(
-            data.imageUrl,
+            sessionData.imageUrl,
             (img) => {
               if (!img) {
                 reject(new Error('Failed to load image'));
@@ -116,7 +123,7 @@ const MaskEditor = () => {
         setLoading(false);
 
       } catch (error) {
-        console.error('Editor initialization failed:', error);
+        console.error('Canvas initialization failed:', error);
         setError(error.message);
         setLoading(false);
       }
@@ -129,7 +136,7 @@ const MaskEditor = () => {
         fabricCanvas.dispose();
       }
     };
-  }, [sessionId, brushSize, dimensions]);
+  }, [sessionData, dimensions, brushSize]);
 
   // History management.
   const addToHistory = (canvasState) => {
