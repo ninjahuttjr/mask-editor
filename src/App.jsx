@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { ErrorBoundary } from 'react-error-boundary';
 import MaskEditor from './components/MaskEditor';
 import TestRequest from './components/TestRequest';
-import { ErrorBoundary } from 'react-error-boundary';
 
 function ErrorFallback({error}) {
   return (
