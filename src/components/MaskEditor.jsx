@@ -1,12 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { fabric } from 'fabric';
 import Toolbar from './Toolbar';
+import { WORKER_URL } from '../config';
 
 // Log when the component loads
 console.log('MaskEditor component loaded');
-
-const WORKER_URL = 'https://proud-sky-f006.2qzyhk4jvk.workers.dev';
-console.log('Worker URL:', WORKER_URL);
 
 const MaskEditor = () => {
   console.log('MaskEditor component rendering');
@@ -19,82 +17,62 @@ const MaskEditor = () => {
   const [historyIndex, setHistoryIndex] = useState(-1);
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
+  const [error, setError] = useState(null);
+  const sessionId = window.location.pathname.split('/').pop();
 
   useEffect(() => {
-    if (!canvasRef.current) return;
-
-    const sessionId = window.location.pathname.split('/').pop();
-    console.log('Session ID:', sessionId);
-
     const initializeCanvas = async () => {
       try {
-        console.log('Fetching session data...');
-        const sessionUrl = `${WORKER_URL}/api/session/${sessionId}`;
-        console.log('Session URL:', sessionUrl);
+        console.log('Initializing editor with session:', sessionId);
         
-        const response = await fetch(sessionUrl);
-        console.log('Session response status:', response.status);
+        const response = await fetch(`${WORKER_URL}/api/session/${sessionId}`);
+        console.log('Session response:', response.status);
         
         if (!response.ok) {
           const errorText = await response.text();
-          console.error('Session fetch error:', errorText);
-          throw new Error('Failed to fetch session data');
+          throw new Error(`Failed to fetch session: ${errorText}`);
         }
         
         const data = await response.json();
         console.log('Session data:', data);
 
-        // Create Fabric canvas with dimensions from session data.
         const fabricCanvas = new fabric.Canvas(canvasRef.current, {
           isDrawingMode: true,
           width: data.width,
           height: data.height,
           backgroundColor: '#2d3748'
         });
-        console.log('Fabric canvas created with dimensions:', data.width, data.height);
 
-        // Draw a test rectangle to verify the canvas is visible.
-        const testRect = new fabric.Rect({
-          left: 10,
-          top: 10,
-          fill: 'red',
-          width: 50,
-          height: 50
-        });
-        fabricCanvas.add(testRect);
-        console.log('Test rectangle added to canvas.');
-
-        // Load the background image using the URL from the session data.
-        const imageUrl = data.imageUrl;
-        console.log('Loading image from:', imageUrl);
-        
-        // Load the image with crossOrigin option.
+        // Load the image
         fabric.Image.fromURL(
-          imageUrl,
+          data.imageUrl,
           (img) => {
-            if (img) {
-              console.log('Image loaded: success');
-              console.log('Image dimensions:', img.width, img.height);
-            } else {
-              console.error('Image loaded: failed');
-            }
             if (!img) {
-              setLoading(false);
-              return;
+              throw new Error('Failed to load image');
             }
+            
+            console.log('Image loaded successfully');
+            
             img.set({
               selectable: false,
               evented: false,
-              scaleX: fabricCanvas.width / img.width,
-              scaleY: fabricCanvas.height / img.height,
             });
-            fabricCanvas.setBackgroundImage(img, () => {
-              fabricCanvas.renderAll();
-              console.log('Canvas rendered with background image.');
-            });
+            
+            // Scale image to fit canvas
+            const scale = Math.min(
+              fabricCanvas.width / img.width,
+              fabricCanvas.height / img.height
+            );
+            
+            img.scale(scale);
+            img.center();
+            
+            fabricCanvas.add(img);
+            fabricCanvas.renderAll();
+            
             setLoading(false);
           },
-          { crossOrigin: 'Anonymous' }
+          { crossOrigin: 'anonymous' }
         );
 
         // Configure brush settings.
@@ -111,11 +89,8 @@ const MaskEditor = () => {
         setCanvas(fabricCanvas);
         addToHistory(fabricCanvas.toJSON());
       } catch (error) {
-        console.error('Error initializing editor:', error);
-        console.error('Full error details:', {
-          message: error.message,
-          stack: error.stack,
-        });
+        console.error('Editor initialization failed:', error);
+        setError(error.message);
         setLoading(false);
       }
     };
@@ -128,7 +103,7 @@ const MaskEditor = () => {
         canvas.dispose();
       }
     };
-  }, []);
+  }, [sessionId]);
 
   // History management.
   const addToHistory = (canvasState) => {
@@ -193,6 +168,10 @@ const MaskEditor = () => {
       alert('Failed to save mask. Please try again.');
     }
   };
+
+  if (error) {
+    return <div className="text-red-500">Error: {error}</div>;
+  }
 
   if (loading) {
     return (
