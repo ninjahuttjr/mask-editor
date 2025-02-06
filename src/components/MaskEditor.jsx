@@ -134,11 +134,17 @@ const MaskEditor = () => {
       backgroundColor: '#2d3748'
     });
 
-    // Configure brush
+    // Configure brush with 100% opacity
     const brush = new fabric.PencilBrush(fabricCanvas);
-    brush.color = 'rgba(255,255,255,0.5)';
+    brush.color = mode === 'eraser' ? '#2d3748' : '#ffffff'; // Solid white for mask, background color for eraser
     brush.width = brushSize;
     fabricCanvas.freeDrawingBrush = brush;
+
+    // Add history tracking
+    fabricCanvas.on('path:created', () => {
+      const canvasState = JSON.stringify(fabricCanvas.toJSON());
+      addToHistory(canvasState);
+    });
 
     // Load image
     fabric.Image.fromURL(
@@ -174,6 +180,11 @@ const MaskEditor = () => {
         fabricCanvas.setBackgroundImage(img, () => {
           fabricCanvas.renderAll();
           console.log('Background image set');
+          
+          // Save initial state to history
+          const initialState = JSON.stringify(fabricCanvas.toJSON());
+          addToHistory(initialState);
+          
           setLoading(false);
         });
       },
@@ -185,7 +196,7 @@ const MaskEditor = () => {
     return () => {
       fabricCanvas.dispose();
     };
-  }, [sessionData, dimensions, brushSize]);
+  }, [sessionData, dimensions, brushSize, mode]);
 
   // Utility function to get image dimensions
   const getImageDimensions = (url) => {
@@ -209,17 +220,17 @@ const MaskEditor = () => {
 
   // History management.
   const addToHistory = (canvasState) => {
-    setHistory((prev) => {
+    setHistory(prev => {
       const newHistory = [...prev.slice(0, historyIndex + 1), canvasState];
-      if (newHistory.length > 50) newHistory.shift(); // Limit history size.
+      if (newHistory.length > 50) newHistory.shift();
       return newHistory;
     });
-    setHistoryIndex((prev) => prev + 1);
+    setHistoryIndex(prev => prev + 1);
   };
 
   const undo = () => {
-    if (historyIndex > 0) {
-      setHistoryIndex((prev) => prev - 1);
+    if (historyIndex > 0 && canvas) {
+      setHistoryIndex(prev => prev - 1);
       canvas.loadFromJSON(history[historyIndex - 1], () => {
         canvas.renderAll();
       });
@@ -227,8 +238,8 @@ const MaskEditor = () => {
   };
 
   const redo = () => {
-    if (historyIndex < history.length - 1) {
-      setHistoryIndex((prev) => prev + 1);
+    if (historyIndex < history.length - 1 && canvas) {
+      setHistoryIndex(prev => prev + 1);
       canvas.loadFromJSON(history[historyIndex + 1], () => {
         canvas.renderAll();
       });
@@ -246,7 +257,7 @@ const MaskEditor = () => {
     setMode(newMode);
     if (canvas) {
       canvas.isDrawingMode = true;
-      canvas.freeDrawingBrush.color = newMode === 'eraser' ? '#2d3748' : 'rgba(255,255,255,0.5)';
+      canvas.freeDrawingBrush.color = newMode === 'eraser' ? '#2d3748' : '#ffffff';
     }
   };
 
@@ -266,7 +277,8 @@ const MaskEditor = () => {
       const response = await fetch(`${WORKER_URL}/api/save-mask`, {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Origin': window.location.origin
         },
         mode: 'cors',
         body: JSON.stringify({ 
@@ -276,19 +288,15 @@ const MaskEditor = () => {
       });
       
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Save response:', response.status, errorText);
-        throw new Error(`Failed to save mask: ${errorText}`);
+        throw new Error(`Failed to save mask: ${await response.text()}`);
       }
       
       const result = await response.json();
       console.log('Save successful:', result);
-      
-      // Only close if save was successful
       window.close();
     } catch (error) {
       console.error('Error saving mask:', error);
-      setError(`Failed to save mask: ${error.message}`);
+      setError(error.message);
     }
   };
 
