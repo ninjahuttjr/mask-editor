@@ -99,7 +99,7 @@ const MaskEditor = () => {
     fetchSessionData();
   }, [sessionId]);
 
-  // Second effect: Initialize canvas after session data is loaded
+  // Second effect: Initialize canvas
   useEffect(() => {
     if (!sessionData || !containerRef.current) {
       console.log('Waiting for initialization...', {
@@ -133,17 +133,6 @@ const MaskEditor = () => {
         containerRef.current.innerHTML = '';
         containerRef.current.appendChild(wrapper);
 
-        console.log('Canvas element created with dimensions:', {
-          wrapper: {
-            width: wrapper.offsetWidth,
-            height: wrapper.offsetHeight
-          },
-          canvas: {
-            width: canvasEl.width,
-            height: canvasEl.height
-          }
-        });
-
         // Initialize Fabric canvas
         fabricCanvas = new fabric.Canvas(canvasEl, {
           isDrawingMode: true,
@@ -151,8 +140,6 @@ const MaskEditor = () => {
           height: dimensions.height,
           backgroundColor: '#2d3748'
         });
-
-        console.log('Fabric canvas initialized');
 
         // Configure brush settings
         const brush = new fabric.PencilBrush(fabricCanvas);
@@ -170,7 +157,6 @@ const MaskEditor = () => {
                 return;
               }
 
-              // Set image to fill canvas while maintaining aspect ratio
               const scaleX = dimensions.width / img.width;
               const scaleY = dimensions.height / img.height;
               const scale = Math.min(scaleX, scaleY);
@@ -311,17 +297,15 @@ const MaskEditor = () => {
       <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
         <div 
           ref={containerRef}
-          className="relative flex items-center justify-center bg-gray-800 rounded-lg"
+          className="relative bg-gray-800 rounded-lg"
           style={{ 
-            minWidth: `${dimensions.width}px`,
-            minHeight: `${dimensions.height}px`,
             width: `${dimensions.width}px`,
             height: `${dimensions.height}px`
           }}
         />
       </div>
       {loading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75">
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75 z-50">
           <div className="text-white">Loading editor...</div>
         </div>
       )}
