@@ -261,28 +261,34 @@ const MaskEditor = () => {
         multiplier: 1,
       });
       
+      console.log('Saving mask for session:', sessionId);
+      
       const response = await fetch(`${WORKER_URL}/api/save-mask`, {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json',
-          // Add mode: 'cors' to explicitly request CORS
-          'Accept': 'application/json'
+          'Content-Type': 'application/json'
         },
         mode: 'cors',
-        credentials: 'include',
-        body: JSON.stringify({ sessionId, maskData }),
+        body: JSON.stringify({ 
+          sessionId, 
+          maskData 
+        }),
       });
       
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('Save response:', response.status, errorText);
         throw new Error(`Failed to save mask: ${errorText}`);
       }
+      
+      const result = await response.json();
+      console.log('Save successful:', result);
       
       // Only close if save was successful
       window.close();
     } catch (error) {
       console.error('Error saving mask:', error);
-      alert('Failed to save mask. Please try again.');
+      setError(`Failed to save mask: ${error.message}`);
     }
   };
 
