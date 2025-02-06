@@ -1,26 +1,7 @@
 import React from 'react';
-import { 
-  Brush,
-  Eraser,
-  Undo2,
-  Redo2,
-  Check
-} from 'lucide-react'; // Correct Lucide icon names
+import { Brush, Eraser, Undo2, Redo2, Save } from 'lucide-react';
 
-const ToolButton = ({ active, icon: Icon, label, onClick }) => (
-  <button
-    onClick={onClick}
-    className={`flex items-center px-3 py-2 rounded-lg transition-colors
-      text-sm font-medium ${
-      active ? 'bg-blue-500 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
-    }`}
-  >
-    <Icon className="w-5 h-5 mr-2" />
-    {label}
-  </button>
-);
-
-const Toolbar = ({ 
+const Toolbar = ({
   mode,
   onModeChange,
   brushSize,
@@ -33,62 +14,56 @@ const Toolbar = ({
 }) => {
   return (
     <div className="flex items-center gap-4 p-4 bg-gray-800">
-      <div className="flex gap-2">
-        <ToolButton
-          active={mode === 'brush'}
-          icon={Brush}
-          label="Brush"
-          onClick={() => onModeChange('brush')}
-        />
-        <ToolButton
-          active={mode === 'eraser'}
-          icon={Eraser}
-          label="Eraser"
-          onClick={() => onModeChange('eraser')}
-        />
-      </div>
+      <button
+        className={`p-2 rounded ${mode === 'brush' ? 'bg-blue-500' : 'bg-gray-700'}`}
+        onClick={() => onModeChange('brush')}
+      >
+        <Brush className="w-6 h-6" />
+      </button>
+      
+      <button
+        className={`p-2 rounded ${mode === 'eraser' ? 'bg-blue-500' : 'bg-gray-700'}`}
+        onClick={() => onModeChange('eraser')}
+      >
+        <Eraser className="w-6 h-6" />
+      </button>
 
-      <div className="flex items-center gap-4 ml-4">
-        <label className="text-white text-sm">Brush Size:</label>
+      <div className="flex items-center gap-2 text-white">
+        <span>Brush Size:</span>
         <input
           type="range"
           min="1"
           max="100"
           value={brushSize}
-          onChange={(e) => onBrushSizeChange(parseInt(e.target.value))}
+          onChange={(e) => onBrushSizeChange(Number(e.target.value))}
           className="w-32"
         />
-        <span className="text-white text-sm">{brushSize}px</span>
-      </div>
-
-      <div className="flex gap-2 ml-4">
-        <button
-          onClick={onUndo}
-          disabled={!canUndo}
-          className={`p-2 rounded-lg transition-colors ${
-            canUndo ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-500'
-          }`}
-        >
-          <Undo2 className="w-5 h-5" />
-        </button>
-        <button
-          onClick={onRedo}
-          disabled={!canRedo}
-          className={`p-2 rounded-lg transition-colors ${
-            canRedo ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-500'
-          }`}
-        >
-          <Redo2 className="w-5 h-5" />
-        </button>
+        <span>{brushSize}px</span>
       </div>
 
       <button
-        onClick={onSave}
-        className="ml-auto flex items-center px-4 py-2 bg-green-500 hover:bg-green-600 
-                   text-white rounded-lg transition-colors"
+        className={`p-2 rounded ${canUndo ? 'bg-gray-700' : 'bg-gray-900 opacity-50'}`}
+        onClick={onUndo}
+        disabled={!canUndo}
       >
-        <Check className="w-5 h-5 mr-2" />
-        Save
+        <Undo2 className="w-6 h-6" />
+      </button>
+
+      <button
+        className={`p-2 rounded ${canRedo ? 'bg-gray-700' : 'bg-gray-900 opacity-50'}`}
+        onClick={onRedo}
+        disabled={!canRedo}
+      >
+        <Redo2 className="w-6 h-6" />
+      </button>
+
+      <div className="flex-grow"></div>
+
+      <button
+        className="p-2 rounded bg-green-500 hover:bg-green-600"
+        onClick={onSave}
+      >
+        <Save className="w-6 h-6" />
       </button>
     </div>
   );

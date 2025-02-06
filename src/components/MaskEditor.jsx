@@ -37,82 +37,75 @@ const MaskEditor = () => {
         
         const data = await response.json();
         console.log('Session data:', data);
-        console.log('Image URL from session:', data.imageUrl);
+
+        // Create a lower-level canvas element first
+        const canvasEl = canvasRef.current;
+        canvasEl.width = data.width || 512;
+        canvasEl.height = data.height || 512;
 
         // Initialize Fabric canvas
-        const fabricCanvas = new fabric.Canvas(canvasRef.current, {
+        const fabricCanvas = new fabric.Canvas(canvasEl, {
           isDrawingMode: true,
-          width: data.width || 512,
-          height: data.height || 512,
           backgroundColor: '#2d3748'
         });
 
         console.log('Canvas initialized with dimensions:', fabricCanvas.width, fabricCanvas.height);
 
-        // Load the image
-        console.log('Attempting to load image from URL:', data.imageUrl);
-        fabric.Image.fromURL(
-          data.imageUrl,
-          (img) => {
-            if (!img) {
-              console.error('Image failed to load');
-              setError('Failed to load image');
-              setLoading(false);
-              return;
-            }
-            
-            console.log('Image loaded successfully:', {
-              originalWidth: img.width,
-              originalHeight: img.height
-            });
-            
-            // Configure image
-            img.set({
-              selectable: false,
-              evented: false,
-            });
-            
-            // Scale image to fit canvas
-            const scaleX = fabricCanvas.width / img.width;
-            const scaleY = fabricCanvas.height / img.height;
-            const scale = Math.min(scaleX, scaleY);
-            
-            console.log('Scaling image by factor:', scale);
-            img.scale(scale);
-            
-            // Center the image
-            img.center();
-            
-            // Add to canvas and render
-            fabricCanvas.add(img);
-            fabricCanvas.renderAll();
-            
-            console.log('Image added to canvas and rendered');
-            setLoading(false);
-          },
-          {
-            crossOrigin: 'anonymous',
-            onError: (err) => {
-              console.error('Error loading image:', err);
-              setError(`Failed to load image: ${err.message}`);
-              setLoading(false);
-            }
-          }
-        );
-
-        // Configure brush settings.
+        // Configure brush settings
         const brush = new fabric.PencilBrush(fabricCanvas);
         brush.color = 'rgba(255,255,255,0.5)';
         brush.width = brushSize;
         fabricCanvas.freeDrawingBrush = brush;
 
-        // Record history on path creation.
+        // Load the image
+        console.log('Loading image from:', data.imageUrl);
+        await new Promise((resolve, reject) => {
+          fabric.Image.fromURL(
+            data.imageUrl,
+            (img) => {
+              if (!img) {
+                reject(new Error('Failed to load image'));
+                return;
+              }
+              
+              console.log('Image loaded:', {
+                width: img.width,
+                height: img.height
+              });
+
+              // Scale image to fit canvas while maintaining aspect ratio
+              const scaleX = fabricCanvas.width / img.width;
+              const scaleY = fabricCanvas.height / img.height;
+              const scale = Math.min(scaleX, scaleY);
+              
+              img.set({
+                scaleX: scale,
+                scaleY: scale,
+                selectable: false,
+                evented: false,
+                left: (fabricCanvas.width - (img.width * scale)) / 2,
+                top: (fabricCanvas.height - (img.height * scale)) / 2
+              });
+
+              // Add image as background
+              fabricCanvas.setBackgroundImage(img, fabricCanvas.renderAll.bind(fabricCanvas));
+              resolve();
+            },
+            {
+              crossOrigin: 'anonymous'
+            }
+          );
+        });
+
+        // Record history on path creation
         fabricCanvas.on('path:created', () => {
-          addToHistory(fabricCanvas.toJSON());
+          addToHistory(fabricCanvas.toJSON(['backgroundImage']));
         });
 
         setCanvas(fabricCanvas);
-        addToHistory(fabricCanvas.toJSON());
+        addToHistory(fabricCanvas.toJSON(['backgroundImage']));
+        setLoading(false);
+
       } catch (error) {
         console.error('Editor initialization failed:', error);
         setError(error.message);
@@ -143,14 +136,18 @@ const MaskEditor = () => {
   const undo = () => {
     if (historyIndex > 0) {
       setHistoryIndex((prev) => prev - 1);
-      canvas.loadFromJSON(history[historyIndex - 1], canvas.renderAll.bind(canvas));
+      canvas.loadFromJSON(history[historyIndex - 1], () => {
+        canvas.renderAll();
+      });
     }
   };
 
   const redo = () => {
     if (historyIndex < history.length - 1) {
       setHistoryIndex((prev) => prev + 1);
-      canvas.loadFromJSON(history[historyIndex + 1], canvas.renderAll.bind(canvas));
+      canvas.loadFromJSON(history[historyIndex + 1], () => {
+        canvas.renderAll();
+      });
     }
   };
 
@@ -164,11 +161,10 @@ const MaskEditor = () => {
   const handleModeChange = (newMode) => {
     setMode(newMode);
     if (!canvas) return;
-    if (newMode === 'eraser') {
-      canvas.freeDrawingBrush.color = 'rgba(0,0,0,0)';
-    } else {
-      canvas.freeDrawingBrush.color = 'rgba(255,255,255,0.5)';
-    }
+    
+    canvas.freeDrawingBrush.color = newMode === 'eraser' 
+      ? 'rgba(0,0,0,0)' 
+      : 'rgba(255,255,255,0.5)';
   };
 
   // Save functionality.
