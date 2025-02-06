@@ -21,6 +21,8 @@ const MaskEditor = () => {
   const sessionId = window.location.pathname.split('/').pop();
 
   useEffect(() => {
+    let fabricCanvas = null;
+
     const initializeCanvas = async () => {
       try {
         console.log('Initializing editor with session:', sessionId);
@@ -38,18 +40,25 @@ const MaskEditor = () => {
         const data = await response.json();
         console.log('Session data:', data);
 
-        // Create a lower-level canvas element first
+        // Wait for the next render cycle to ensure canvas element exists
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        if (!canvasRef.current) {
+          throw new Error('Canvas element not found');
+        }
+
+        // Create a new canvas element
         const canvasEl = canvasRef.current;
         canvasEl.width = data.width || 512;
         canvasEl.height = data.height || 512;
 
         // Initialize Fabric canvas
-        const fabricCanvas = new fabric.Canvas(canvasEl, {
+        fabricCanvas = new fabric.Canvas(canvasEl, {
           isDrawingMode: true,
+          width: data.width || 512,
+          height: data.height || 512,
           backgroundColor: '#2d3748'
         });
-
-        console.log('Canvas initialized with dimensions:', fabricCanvas.width, fabricCanvas.height);
 
         // Configure brush settings
         const brush = new fabric.PencilBrush(fabricCanvas);
@@ -58,7 +67,6 @@ const MaskEditor = () => {
         fabricCanvas.freeDrawingBrush = brush;
 
         // Load the image
-        console.log('Loading image from:', data.imageUrl);
         await new Promise((resolve, reject) => {
           fabric.Image.fromURL(
             data.imageUrl,
@@ -67,13 +75,7 @@ const MaskEditor = () => {
                 reject(new Error('Failed to load image'));
                 return;
               }
-              
-              console.log('Image loaded:', {
-                width: img.width,
-                height: img.height
-              });
 
-              // Scale image to fit canvas while maintaining aspect ratio
               const scaleX = fabricCanvas.width / img.width;
               const scaleY = fabricCanvas.height / img.height;
               const scale = Math.min(scaleX, scaleY);
@@ -87,17 +89,13 @@ const MaskEditor = () => {
                 top: (fabricCanvas.height - (img.height * scale)) / 2
               });
 
-              // Add image as background
               fabricCanvas.setBackgroundImage(img, fabricCanvas.renderAll.bind(fabricCanvas));
               resolve();
             },
-            {
-              crossOrigin: 'anonymous'
-            }
+            { crossOrigin: 'anonymous' }
           );
         });
 
-        // Record history on path creation
         fabricCanvas.on('path:created', () => {
           addToHistory(fabricCanvas.toJSON(['backgroundImage']));
         });
@@ -115,13 +113,12 @@ const MaskEditor = () => {
 
     initializeCanvas();
 
-    // Cleanup: Dispose the canvas on unmount.
     return () => {
-      if (canvas) {
-        canvas.dispose();
+      if (fabricCanvas) {
+        fabricCanvas.dispose();
       }
     };
-  }, [sessionId]);
+  }, [sessionId, brushSize]);
 
   // History management.
   const addToHistory = (canvasState) => {
