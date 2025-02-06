@@ -124,6 +124,8 @@ const MaskEditor = () => {
       (img) => {
         if (!img) {
           console.error('Failed to load image');
+          setError('Failed to load image');
+          setLoading(false);
           return;
         }
 
