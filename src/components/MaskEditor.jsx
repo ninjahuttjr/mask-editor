@@ -276,7 +276,12 @@ const MaskEditor = () => {
   // Save functionality.
   const handleSave = async () => {
     if (!canvas) return;
+    
+    // Add loading state
+    const [isSaving, setIsSaving] = useState(false);
+    
     try {
+      setIsSaving(true);
       const sessionId = window.location.pathname.split('/').pop();
       console.log('Starting save process for session:', sessionId);
 
@@ -298,7 +303,7 @@ const MaskEditor = () => {
       // Draw the paths directly to the 2D context
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = brushSize; // Use the current brush size
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
 
@@ -320,6 +325,9 @@ const MaskEditor = () => {
               ctx.quadraticCurveTo(cmd[1], cmd[2], cmd[3], cmd[4]);
             }
           });
+          
+          // Set the stroke width to match the original path
+          ctx.lineWidth = obj.strokeWidth || brushSize;
           
           if (obj.stroke === '#2d3748') {
             ctx.strokeStyle = '#000000';
@@ -355,15 +363,23 @@ const MaskEditor = () => {
       console.log('Save response:', result);
 
       if (result.status === 'success') {
-        console.log('Save successful, closing window');
-        window.close();
+        setError(null);
+        // Show success message and wait for user acknowledgment
+        const confirmed = window.confirm(
+          "Mask saved successfully! Click OK to close the editor and return to Discord."
+        );
+        if (confirmed) {
+          window.close();
+        }
       } else {
         throw new Error('Save failed: ' + (result.error || 'Unknown error'));
       }
 
     } catch (error) {
       console.error('Save error:', error);
-      setError(error.message);
+      setError(`Failed to save mask: ${error.message}`);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -397,6 +413,7 @@ const MaskEditor = () => {
         onUndo={undo}
         onRedo={redo}
         onSave={handleSave}
+        isSaving={isSaving}
       />
       <div className="flex-1 p-4 flex items-center justify-center">
         <div 
@@ -408,9 +425,16 @@ const MaskEditor = () => {
           }}
         />
       </div>
-      {loading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75 z-50">
-          <div className="text-white text-lg">Loading editor...</div>
+      {error && (
+        <div className="fixed bottom-4 left-4 right-4 bg-red-500 text-white p-4 rounded-lg">
+          {error}
+        </div>
+      )}
+      {isSaving && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="bg-gray-800 p-4 rounded-lg text-white">
+            Saving mask...
+          </div>
         </div>
       )}
     </div>

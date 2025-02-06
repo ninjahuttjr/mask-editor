@@ -10,7 +10,8 @@ const Toolbar = ({
   canRedo,
   onUndo,
   onRedo,
-  onSave
+  onSave,
+  isSaving
 }) => {
   return (
     <div className="flex items-center gap-4 p-4 bg-gray-800">
@@ -60,10 +61,15 @@ const Toolbar = ({
       <div className="flex-grow"></div>
 
       <button
-        className="p-2 rounded bg-green-500 hover:bg-green-600"
         onClick={onSave}
+        disabled={isSaving}
+        className={`px-4 py-2 rounded-lg ${
+          isSaving 
+            ? 'bg-gray-500 cursor-not-allowed' 
+            : 'bg-green-600 hover:bg-green-700'
+        } text-white`}
       >
-        <Save className="w-6 h-6" />
+        {isSaving ? 'Saving...' : 'Save'}
       </button>
     </div>
   );
