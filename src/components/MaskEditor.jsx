@@ -20,6 +20,15 @@ const MaskEditor = () => {
   const sessionId = window.location.pathname.split('/').pop();
   const [sessionData, setSessionData] = useState(null);
   const [dimensions, setDimensions] = useState({ width: 512, height: 512 });
+  const [containerReady, setContainerReady] = useState(false);
+
+  // Check container mounting
+  useLayoutEffect(() => {
+    if (containerRef.current) {
+      console.log('Container mounted:', containerRef.current);
+      setContainerReady(true);
+    }
+  }, []);
 
   // Utility function to get image dimensions
   const getImageDimensions = (url) => {
@@ -60,7 +69,7 @@ const MaskEditor = () => {
     return { width: newWidth, height: newHeight };
   };
 
-  // First effect: Fetch session data and validate image
+  // First effect: Fetch session data
   useEffect(() => {
     const fetchSessionData = async () => {
       try {
@@ -68,29 +77,23 @@ const MaskEditor = () => {
         const response = await fetch(`${WORKER_URL}/api/session/${sessionId}`);
         
         if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Failed to fetch session: ${errorText}`);
+          throw new Error(`Failed to fetch session: ${await response.text()}`);
         }
         
         const data = await response.json();
         console.log('Session data received:', data);
 
         // Validate image dimensions
-        console.log('Validating image dimensions...');
         const imageDimensions = await getImageDimensions(data.imageUrl);
-        console.log('Image validation complete:', imageDimensions);
-
-        // Calculate appropriate canvas dimensions
         const scaledDimensions = calculateScaledDimensions(
           imageDimensions.width,
           imageDimensions.height
         );
-        console.log('Scaled dimensions:', scaledDimensions);
-
+        
         setDimensions(scaledDimensions);
         setSessionData(data);
       } catch (error) {
-        console.error('Session initialization failed:', error);
+        console.error('Session fetch failed:', error);
         setError(error.message);
         setLoading(false);
       }
@@ -101,37 +104,34 @@ const MaskEditor = () => {
 
   // Second effect: Initialize canvas
   useEffect(() => {
-    if (!sessionData || !containerRef.current) {
+    if (!sessionData || !containerReady || !containerRef.current) {
       console.log('Waiting for initialization...', {
         hasSessionData: !!sessionData,
+        isContainerReady: containerReady,
         hasContainer: !!containerRef.current,
-        containerDimensions: containerRef.current ? {
-          width: containerRef.current.offsetWidth,
-          height: containerRef.current.offsetHeight,
-        } : null,
-        currentDimensions: dimensions
+        containerElement: containerRef.current
       });
       return;
     }
 
-    console.log('Starting canvas initialization with dimensions:', dimensions);
+    console.log('Starting canvas initialization');
     let fabricCanvas = null;
 
     const initializeCanvas = async () => {
       try {
-        // Create canvas element with wrapper
-        const wrapper = document.createElement('div');
-        wrapper.className = 'canvas-container';
-        wrapper.style.width = `${dimensions.width}px`;
-        wrapper.style.height = `${dimensions.height}px`;
-        
+        // Clear existing content
+        containerRef.current.innerHTML = '';
+
+        // Create canvas element
         const canvasEl = document.createElement('canvas');
         canvasEl.width = dimensions.width;
         canvasEl.height = dimensions.height;
+        canvasEl.className = 'rounded-lg';
         
-        wrapper.appendChild(canvasEl);
-        containerRef.current.innerHTML = '';
-        containerRef.current.appendChild(wrapper);
+        // Append canvas directly
+        containerRef.current.appendChild(canvasEl);
+
+        console.log('Canvas element created:', canvasEl);
 
         // Initialize Fabric canvas
         fabricCanvas = new fabric.Canvas(canvasEl, {
@@ -141,13 +141,15 @@ const MaskEditor = () => {
           backgroundColor: '#2d3748'
         });
 
-        // Configure brush settings
+        console.log('Fabric canvas initialized');
+
+        // Configure brush
         const brush = new fabric.PencilBrush(fabricCanvas);
         brush.color = 'rgba(255,255,255,0.5)';
         brush.width = brushSize;
         fabricCanvas.freeDrawingBrush = brush;
 
-        // Load and scale the image
+        // Load image
         await new Promise((resolve, reject) => {
           fabric.Image.fromURL(
             sessionData.imageUrl,
@@ -194,7 +196,7 @@ const MaskEditor = () => {
         fabricCanvas.dispose();
       }
     };
-  }, [sessionData, dimensions, brushSize]);
+  }, [sessionData, containerReady, dimensions, brushSize]);
 
   // History management.
   const addToHistory = (canvasState) => {
@@ -233,11 +235,10 @@ const MaskEditor = () => {
 
   const handleModeChange = (newMode) => {
     setMode(newMode);
-    if (!canvas) return;
-    
-    canvas.freeDrawingBrush.color = newMode === 'eraser' 
-      ? 'rgba(0,0,0,0)' 
-      : 'rgba(255,255,255,0.5)';
+    if (canvas) {
+      canvas.isDrawingMode = true;
+      canvas.freeDrawingBrush.color = newMode === 'eraser' ? '#2d3748' : 'rgba(255,255,255,0.5)';
+    }
   };
 
   // Save functionality.
