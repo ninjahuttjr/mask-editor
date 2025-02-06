@@ -15,13 +15,11 @@ const MaskEditor = () => {
   const [loading, setLoading] = useState(true);
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
-  const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const [error, setError] = useState(null);
   const sessionId = window.location.pathname.split('/').pop();
   const [sessionData, setSessionData] = useState(null);
   const [dimensions, setDimensions] = useState({ width: 512, height: 512 });
-  const [canvasReady, setCanvasReady] = useState(false);
 
   // First effect: Fetch session data
   useEffect(() => {
@@ -52,21 +50,12 @@ const MaskEditor = () => {
     fetchSessionData();
   }, [sessionId]);
 
-  // Use Layout Effect to check canvas mounting
-  useLayoutEffect(() => {
-    if (canvasRef.current) {
-      console.log('Canvas element mounted:', canvasRef.current);
-      setCanvasReady(true);
-    }
-  }, []);
-
-  // Second effect: Initialize canvas after session data is loaded and canvas is mounted
+  // Second effect: Initialize canvas after session data is loaded
   useEffect(() => {
-    if (!sessionData || !canvasReady) {
+    if (!sessionData || !containerRef.current) {
       console.log('Waiting for initialization...', {
         hasSessionData: !!sessionData,
-        isCanvasReady: canvasReady,
-        canvasElement: canvasRef.current
+        hasContainer: !!containerRef.current
       });
       return;
     }
@@ -76,13 +65,17 @@ const MaskEditor = () => {
 
     const initializeCanvas = async () => {
       try {
-        const canvasEl = canvasRef.current;
-        console.log('Canvas element dimensions:', {
-          width: canvasEl.width,
-          height: canvasEl.height,
-          offsetWidth: canvasEl.offsetWidth,
-          offsetHeight: canvasEl.offsetHeight
-        });
+        // Create canvas element
+        const canvasEl = document.createElement('canvas');
+        canvasEl.width = dimensions.width;
+        canvasEl.height = dimensions.height;
+        canvasEl.className = 'shadow-lg bg-gray-800';
+        
+        // Clear container and append new canvas
+        containerRef.current.innerHTML = '';
+        containerRef.current.appendChild(canvasEl);
+
+        console.log('Canvas element created and mounted');
 
         // Initialize Fabric canvas
         fabricCanvas = new fabric.Canvas(canvasEl, {
@@ -92,7 +85,7 @@ const MaskEditor = () => {
           backgroundColor: '#2d3748'
         });
 
-        console.log('Fabric canvas initialized:', fabricCanvas);
+        console.log('Fabric canvas initialized');
 
         // Configure brush settings
         const brush = new fabric.PencilBrush(fabricCanvas);
@@ -154,7 +147,7 @@ const MaskEditor = () => {
         fabricCanvas.dispose();
       }
     };
-  }, [sessionData, canvasReady, dimensions, brushSize]);
+  }, [sessionData, dimensions, brushSize]);
 
   // History management.
   const addToHistory = (canvasState) => {
@@ -254,16 +247,10 @@ const MaskEditor = () => {
         onRedo={redo}
         onSave={handleSave}
       />
-      <div 
-        ref={containerRef}
-        className="flex-1 overflow-auto p-4 flex items-center justify-center"
-      >
-        {/* The canvas has an inline red border for debugging */}
-        <canvas 
-          ref={canvasRef}
-          width={dimensions.width}
-          height={dimensions.height}
-          className="shadow-lg bg-gray-800"
+      <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
+        <div 
+          ref={containerRef}
+          className="flex items-center justify-center"
         />
       </div>
     </div>
