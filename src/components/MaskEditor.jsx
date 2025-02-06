@@ -22,6 +22,9 @@ const MaskEditor = () => {
   const sessionId = window.location.pathname.split('/').pop();
   const [sessionData, setSessionData] = useState(null);
   const [dimensions, setDimensions] = useState({ width: 512, height: 512 });
+  const [maskUrl, setMaskUrl] = useState(null);
+  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+  const [prompt, setPrompt] = useState('');
 
   // First effect: Fetch session data
   useEffect(() => {
@@ -276,102 +279,111 @@ const MaskEditor = () => {
 
   // Save functionality.
   const handleSave = async () => {
-    if (!canvas) return;
+    if (!canvas || !sessionData) return;
     
     try {
       setIsSaving(true);
       const sessionId = window.location.pathname.split('/').pop();
-      console.log('Starting save process for session:', sessionId);
+      
+      // Get original image dimensions from sessionData
+      const originalWidth = sessionData.width;
+      const originalHeight = sessionData.height;
 
-      // Get current canvas size
-      const width = canvas.getWidth();
-      const height = canvas.getHeight();
-      console.log('Canvas dimensions:', { width, height });
+      console.log('Creating mask at original dimensions:', { originalWidth, originalHeight });
 
-      // Create a simple 2D canvas for the mask
-      const maskCanvas = document.createElement('canvas');
-      maskCanvas.width = width;
-      maskCanvas.height = height;
-      const ctx = maskCanvas.getContext('2d');
+      // Create a temporary canvas at original image dimensions
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = originalWidth;
+      tempCanvas.height = originalHeight;
+      const ctx = tempCanvas.getContext('2d');
 
-      // Fill with black background
+      // Fill with black background (represents unmasked areas)
       ctx.fillStyle = '#000000';
-      ctx.fillRect(0, 0, width, height);
+      ctx.fillRect(0, 0, originalWidth, originalHeight);
 
-      // Draw the paths directly to the 2D context
+      // Scale factor between editor canvas and original image
+      const scaleX = originalWidth / dimensions.width;
+      const scaleY = originalHeight / dimensions.height;
+
+      console.log('Using scale factors:', { scaleX, scaleY });
+
+      // Draw the paths scaled to original dimensions
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = brushSize; // Use the current brush size
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
 
       const objects = canvas.getObjects();
-      console.log('Processing', objects.length, 'objects');
+      console.log(`Processing ${objects.length} objects`);
 
-      objects.forEach(obj => {
+      objects.forEach((obj) => {
         if (obj.type === 'path') {
           const path = obj.path;
           if (!path) return;
 
           ctx.beginPath();
-          path.forEach((cmd, i) => {
+          path.forEach((cmd) => {
             if (cmd[0] === 'M') {
-              ctx.moveTo(cmd[1], cmd[2]);
+              ctx.moveTo(cmd[1] * scaleX, cmd[2] * scaleY);
             } else if (cmd[0] === 'L') {
-              ctx.lineTo(cmd[1], cmd[2]);
+              ctx.lineTo(cmd[1] * scaleX, cmd[2] * scaleY);
             } else if (cmd[0] === 'Q') {
-              ctx.quadraticCurveTo(cmd[1], cmd[2], cmd[3], cmd[4]);
+              ctx.quadraticCurveTo(
+                cmd[1] * scaleX, 
+                cmd[2] * scaleY, 
+                cmd[3] * scaleX, 
+                cmd[4] * scaleY
+              );
             }
           });
           
-          // Set the stroke width to match the original path
-          ctx.lineWidth = obj.strokeWidth || brushSize;
-          
-          if (obj.stroke === '#2d3748') {
-            ctx.strokeStyle = '#000000';
-          } else {
-            ctx.strokeStyle = '#ffffff';
-          }
-          
+          ctx.lineWidth = obj.strokeWidth * scaleX;
+          ctx.strokeStyle = obj.stroke === '#2d3748' ? '#000000' : '#ffffff';
           ctx.stroke();
         }
       });
 
-      console.log('Finished drawing paths');
+      const maskData = tempCanvas.toDataURL('image/png');
+      tempCanvas.remove();
 
-      // Get the mask data
-      const maskData = maskCanvas.toDataURL('image/png');
-      console.log('Generated mask data, length:', maskData.length);
-
-      // Clean up
-      maskCanvas.remove();
-
-      console.log('Sending save request...');
-      const response = await fetch(`${WORKER_URL}/api/save-mask`, {
+      // Save mask to Cloudflare Worker
+      const saveResponse = await fetch(`${WORKER_URL}/api/save-mask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, maskData })
+        body: JSON.stringify({ 
+          sessionId, 
+          maskData,
+          prompt: prompt.trim()
+        })
       });
 
-      if (!response.ok) {
-        throw new Error(`Save failed: ${response.status} ${await response.text()}`);
+      if (!saveResponse.ok) {
+        throw new Error(`Save failed: ${saveResponse.statusText}`);
       }
 
-      const result = await response.json();
-      console.log('Save response:', result);
+      const saveResult = await saveResponse.json();
+      
+      // Send to backend for inpainting
+      const inpaintResponse = await fetch('http://localhost:8000/api/inpaint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: saveResult.sessionId,
+          prompt: prompt.trim()
+        })
+      });
 
-      if (result.status === 'success') {
-        setError(null);
-        // Show success message and wait for user acknowledgment
-        const confirmed = window.confirm(
-          "Mask saved successfully! Click OK to close the editor and return to Discord."
-        );
-        if (confirmed) {
-          window.close();
-        }
-      } else {
-        throw new Error('Save failed: ' + (result.error || 'Unknown error'));
+      if (!inpaintResponse.ok) {
+        throw new Error(`Inpainting failed: ${inpaintResponse.statusText}`);
       }
+
+      const inpaintResult = await inpaintResponse.json();
+      
+      // Show success message
+      setShowSaveSuccess(true);
+      setTimeout(() => {
+        window.close();
+      }, 2000);
 
     } catch (error) {
       console.error('Save error:', error);
@@ -412,6 +424,8 @@ const MaskEditor = () => {
         onRedo={redo}
         onSave={handleSave}
         isSaving={isSaving}
+        prompt={prompt}
+        onPromptChange={setPrompt}
       />
       <div className="flex-1 p-4 flex items-center justify-center">
         <div 
