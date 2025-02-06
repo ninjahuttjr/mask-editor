@@ -279,67 +279,68 @@ const MaskEditor = () => {
     try {
       const sessionId = window.location.pathname.split('/').pop();
       
-      // Create a temporary canvas for the mask only
+      // Create a temporary canvas at the original dimensions
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = dimensions.width;
       tempCanvas.height = dimensions.height;
       const ctx = tempCanvas.getContext('2d');
       
       // Fill with black (transparent in mask)
-      ctx.fillStyle = '#2d3748';
+      ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, dimensions.width, dimensions.height);
       
-      // Get only the paths (not background) and draw them in white
-      const objects = canvas.getObjects();
-      objects.forEach(obj => {
-        if (obj.type === 'path') {
-          const color = obj.stroke === '#2d3748' ? '#2d3748' : '#ffffff';
-          obj.set({
-            stroke: color,
-            opacity: 1
-          });
+      // Draw the current canvas content to the temp canvas
+      const dataUrl = canvas.toDataURL({
+        format: 'png',
+        quality: 1,
+        multiplier: 1,
+      });
+      
+      // Create a new image to draw
+      const img = new Image();
+      img.onload = async () => {
+        // Draw the image to our temporary canvas
+        ctx.drawImage(img, 0, 0);
+        
+        // Get the final mask data
+        const maskData = tempCanvas.toDataURL('image/png');
+        
+        console.log('Saving mask for session:', sessionId);
+        
+        const response = await fetch(`${WORKER_URL}/api/save-mask`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json'
+          },
+          mode: 'cors',
+          body: JSON.stringify({ 
+            sessionId, 
+            maskData 
+          }),
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to save mask: ${errorText}`);
         }
-      });
+        
+        const result = await response.json();
+        console.log('Save successful:', result);
+        
+        // Clean up
+        tempCanvas.remove();
+        
+        if (result.status === 'success') {
+          window.close();
+        }
+      };
       
-      // Draw the objects to our temporary canvas
-      const tempFabricCanvas = new fabric.Canvas(tempCanvas);
-      tempFabricCanvas.add(...objects);
-      tempFabricCanvas.renderAll();
+      img.onerror = (error) => {
+        throw new Error('Failed to process mask image: ' + error.message);
+      };
       
-      // Get the data URL of just the mask
-      const maskData = tempCanvas.toDataURL('image/png');
+      img.src = dataUrl;
       
-      console.log('Saving mask for session:', sessionId);
-      
-      const response = await fetch(`${WORKER_URL}/api/save-mask`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json'
-        },
-        mode: 'cors',
-        body: JSON.stringify({ 
-          sessionId, 
-          maskData 
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Save response:', response.status, errorText);
-        throw new Error(`Failed to save mask: ${errorText}`);
-      }
-      
-      const result = await response.json();
-      console.log('Save successful:', result);
-      
-      // Clean up
-      tempFabricCanvas.dispose();
-      tempCanvas.remove();
-      
-      // Only close if save was successful
-      if (result.status === 'success') {
-        window.close();
-      }
     } catch (error) {
       console.error('Error saving mask:', error);
       setError(`Failed to save mask: ${error.message}`);
