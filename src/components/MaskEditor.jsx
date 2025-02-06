@@ -24,7 +24,6 @@ const MaskEditor = () => {
   const [dimensions, setDimensions] = useState({ width: 512, height: 512 });
   const [maskUrl, setMaskUrl] = useState(null);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
-  const [prompt, setPrompt] = useState('');
 
   // First effect: Fetch session data
   useEffect(() => {
@@ -316,7 +315,7 @@ const MaskEditor = () => {
       const objects = canvas.getObjects();
       console.log(`Processing ${objects.length} objects`);
 
-      objects.forEach((obj) => {
+      objects.forEach((obj, index) => {
         if (obj.type === 'path') {
           const path = obj.path;
           if (!path) return;
@@ -338,52 +337,43 @@ const MaskEditor = () => {
           });
           
           ctx.lineWidth = obj.strokeWidth * scaleX;
+          // White for mask, black for erase
           ctx.strokeStyle = obj.stroke === '#2d3748' ? '#000000' : '#ffffff';
           ctx.stroke();
         }
       });
 
+      console.log('Finished drawing scaled paths');
+
+      // Get the mask data
       const maskData = tempCanvas.toDataURL('image/png');
       tempCanvas.remove();
 
-      // Save mask to Cloudflare Worker
-      const saveResponse = await fetch(`${WORKER_URL}/api/save-mask`, {
+      console.log('Generated mask data, length:', maskData.length);
+
+      // Save mask
+      const response = await fetch(`${WORKER_URL}/api/save-mask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           sessionId, 
-          maskData,
-          prompt: prompt.trim()
+          maskData
         })
       });
 
-      if (!saveResponse.ok) {
-        throw new Error(`Save failed: ${saveResponse.statusText}`);
+      if (!response.ok) {
+        throw new Error(`Save failed: ${response.statusText}`);
       }
 
-      const saveResult = await saveResponse.json();
-      
-      // Send to backend for inpainting
-      const inpaintResponse = await fetch('http://localhost:8000/api/inpaint', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: saveResult.sessionId,
-          prompt: prompt.trim()
-        })
-      });
+      const result = await response.json();
+      console.log('Save response:', result);
 
-      if (!inpaintResponse.ok) {
-        throw new Error(`Inpainting failed: ${inpaintResponse.statusText}`);
+      if (result.error) {
+        throw new Error(result.error);
       }
 
-      const inpaintResult = await inpaintResponse.json();
-      
-      // Show success message
+      setMaskUrl(result.maskUrl);
       setShowSaveSuccess(true);
-      setTimeout(() => {
-        window.close();
-      }, 2000);
 
     } catch (error) {
       console.error('Save error:', error);
@@ -424,8 +414,6 @@ const MaskEditor = () => {
         onRedo={redo}
         onSave={handleSave}
         isSaving={isSaving}
-        prompt={prompt}
-        onPromptChange={setPrompt}
       />
       <div className="flex-1 p-4 flex items-center justify-center">
         <div 

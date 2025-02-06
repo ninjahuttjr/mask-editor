@@ -11,9 +11,7 @@ const Toolbar = ({
   onUndo,
   onRedo,
   onSave,
-  isSaving,
-  prompt,
-  onPromptChange
+  isSaving
 }) => {
   return (
     <div className="flex items-center gap-4 p-4 bg-gray-800">
@@ -60,25 +58,17 @@ const Toolbar = ({
         <Redo2 className="w-6 h-6" />
       </button>
 
-      <div className="flex-grow">
-        <input
-          type="text"
-          placeholder="Enter inpainting prompt (leave empty to keep original)"
-          value={prompt}
-          onChange={(e) => onPromptChange(e.target.value)}
-          className="w-full px-3 py-2 bg-gray-700 text-white rounded-lg"
-          disabled={isSaving}
-        />
-      </div>
+      <div className="flex-grow"></div>
 
       <button
         onClick={onSave}
         disabled={isSaving}
-        className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
-          isSaving ? 'bg-gray-600' : 'bg-blue-600 hover:bg-blue-700'
+        className={`px-4 py-2 rounded-lg ${
+          isSaving 
+            ? 'bg-gray-500 cursor-not-allowed' 
+            : 'bg-green-600 hover:bg-green-700'
         } text-white`}
       >
-        <Save className="w-5 h-5" />
         {isSaving ? 'Saving...' : 'Save'}
       </button>
     </div>
