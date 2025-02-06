@@ -19,6 +19,7 @@ const MaskEditor = () => {
   const containerRef = useRef(null);
   const [error, setError] = useState(null);
   const sessionId = window.location.pathname.split('/').pop();
+  const [dimensions, setDimensions] = useState({ width: 512, height: 512 });
 
   useEffect(() => {
     let fabricCanvas = null;
@@ -40,25 +41,33 @@ const MaskEditor = () => {
         const data = await response.json();
         console.log('Session data:', data);
 
-        // Wait for the next render cycle to ensure canvas element exists
-        await new Promise(resolve => setTimeout(resolve, 0));
+        // Set dimensions from session data
+        setDimensions({
+          width: data.width || 512,
+          height: data.height || 512
+        });
 
+        // Wait for the next render cycle
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        console.log('Canvas ref:', canvasRef.current);
         if (!canvasRef.current) {
           throw new Error('Canvas element not found');
         }
 
-        // Create a new canvas element
+        // Initialize the canvas element
         const canvasEl = canvasRef.current;
-        canvasEl.width = data.width || 512;
-        canvasEl.height = data.height || 512;
-
+        console.log('Initializing canvas with dimensions:', dimensions);
+        
         // Initialize Fabric canvas
         fabricCanvas = new fabric.Canvas(canvasEl, {
           isDrawingMode: true,
-          width: data.width || 512,
-          height: data.height || 512,
+          width: dimensions.width,
+          height: dimensions.height,
           backgroundColor: '#2d3748'
         });
+
+        console.log('Fabric canvas initialized:', fabricCanvas);
 
         // Configure brush settings
         const brush = new fabric.PencilBrush(fabricCanvas);
@@ -67,6 +76,7 @@ const MaskEditor = () => {
         fabricCanvas.freeDrawingBrush = brush;
 
         // Load the image
+        console.log('Loading image from:', data.imageUrl);
         await new Promise((resolve, reject) => {
           fabric.Image.fromURL(
             data.imageUrl,
@@ -76,6 +86,7 @@ const MaskEditor = () => {
                 return;
               }
 
+              console.log('Image loaded successfully');
               const scaleX = fabricCanvas.width / img.width;
               const scaleY = fabricCanvas.height / img.height;
               const scale = Math.min(scaleX, scaleY);
@@ -118,7 +129,7 @@ const MaskEditor = () => {
         fabricCanvas.dispose();
       }
     };
-  }, [sessionId, brushSize]);
+  }, [sessionId, brushSize, dimensions]);
 
   // History management.
   const addToHistory = (canvasState) => {
@@ -223,7 +234,12 @@ const MaskEditor = () => {
         className="flex-1 overflow-auto p-4 flex items-center justify-center"
       >
         {/* The canvas has an inline red border for debugging */}
-        <canvas ref={canvasRef} className="shadow-lg" style={{ border: "1px solid red" }} />
+        <canvas 
+          ref={canvasRef}
+          width={dimensions.width}
+          height={dimensions.height}
+          className="shadow-lg"
+        />
       </div>
     </div>
   );
