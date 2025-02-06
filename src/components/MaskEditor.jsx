@@ -308,13 +308,23 @@ const MaskEditor = () => {
         onRedo={redo}
         onSave={handleSave}
       />
-      <div className="flex-1 overflow-auto p-4">
+      <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
         <div 
           ref={containerRef}
-          className="w-full h-full flex items-center justify-center"
-          style={{ minHeight: `${dimensions.height}px` }}
+          className="relative flex items-center justify-center bg-gray-800 rounded-lg"
+          style={{ 
+            minWidth: `${dimensions.width}px`,
+            minHeight: `${dimensions.height}px`,
+            width: `${dimensions.width}px`,
+            height: `${dimensions.height}px`
+          }}
         />
       </div>
+      {loading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75">
+          <div className="text-white">Loading editor...</div>
+        </div>
+      )}
     </div>
   );
 };
