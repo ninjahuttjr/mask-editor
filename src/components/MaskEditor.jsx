@@ -13,6 +13,7 @@ const MaskEditor = () => {
   const [mode, setMode] = useState('brush');
   const [brushSize, setBrushSize] = useState(20);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const containerRef = useRef(null);
@@ -276,9 +277,6 @@ const MaskEditor = () => {
   // Save functionality.
   const handleSave = async () => {
     if (!canvas) return;
-    
-    // Add loading state
-    const [isSaving, setIsSaving] = useState(false);
     
     try {
       setIsSaving(true);
