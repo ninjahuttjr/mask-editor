@@ -55,7 +55,11 @@ const MaskEditor = () => {
     if (!sessionData || !containerRef.current) {
       console.log('Waiting for initialization...', {
         hasSessionData: !!sessionData,
-        hasContainer: !!containerRef.current
+        hasContainer: !!containerRef.current,
+        containerDimensions: containerRef.current ? {
+          width: containerRef.current.offsetWidth,
+          height: containerRef.current.offsetHeight
+        } : null
       });
       return;
     }
@@ -65,17 +69,21 @@ const MaskEditor = () => {
 
     const initializeCanvas = async () => {
       try {
-        // Create canvas element
+        // Create canvas element with wrapper
+        const wrapper = document.createElement('div');
+        wrapper.className = 'canvas-container';
+        wrapper.style.width = `${dimensions.width}px`;
+        wrapper.style.height = `${dimensions.height}px`;
+        
         const canvasEl = document.createElement('canvas');
         canvasEl.width = dimensions.width;
         canvasEl.height = dimensions.height;
-        canvasEl.className = 'shadow-lg bg-gray-800';
         
-        // Clear container and append new canvas
+        wrapper.appendChild(canvasEl);
         containerRef.current.innerHTML = '';
-        containerRef.current.appendChild(canvasEl);
+        containerRef.current.appendChild(wrapper);
 
-        console.log('Canvas element created and mounted');
+        console.log('Canvas element created with dimensions:', dimensions);
 
         // Initialize Fabric canvas
         fabricCanvas = new fabric.Canvas(canvasEl, {
@@ -247,10 +255,11 @@ const MaskEditor = () => {
         onRedo={redo}
         onSave={handleSave}
       />
-      <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
+      <div className="flex-1 overflow-auto p-4">
         <div 
           ref={containerRef}
-          className="flex items-center justify-center"
+          className="w-full h-full flex items-center justify-center"
+          style={{ minHeight: `${dimensions.height}px` }}
         />
       </div>
     </div>
