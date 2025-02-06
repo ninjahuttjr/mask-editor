@@ -25,54 +25,79 @@ const MaskEditor = () => {
       try {
         console.log('Initializing editor with session:', sessionId);
         
+        // Fetch session data
         const response = await fetch(`${WORKER_URL}/api/session/${sessionId}`);
-        console.log('Session response:', response.status);
+        console.log('Session response status:', response.status);
         
         if (!response.ok) {
           const errorText = await response.text();
+          console.error('Session fetch error:', errorText);
           throw new Error(`Failed to fetch session: ${errorText}`);
         }
         
         const data = await response.json();
         console.log('Session data:', data);
+        console.log('Image URL from session:', data.imageUrl);
 
+        // Initialize Fabric canvas
         const fabricCanvas = new fabric.Canvas(canvasRef.current, {
           isDrawingMode: true,
-          width: data.width,
-          height: data.height,
+          width: data.width || 512,
+          height: data.height || 512,
           backgroundColor: '#2d3748'
         });
 
+        console.log('Canvas initialized with dimensions:', fabricCanvas.width, fabricCanvas.height);
+
         // Load the image
+        console.log('Attempting to load image from URL:', data.imageUrl);
         fabric.Image.fromURL(
           data.imageUrl,
           (img) => {
             if (!img) {
-              throw new Error('Failed to load image');
+              console.error('Image failed to load');
+              setError('Failed to load image');
+              setLoading(false);
+              return;
             }
             
-            console.log('Image loaded successfully');
+            console.log('Image loaded successfully:', {
+              originalWidth: img.width,
+              originalHeight: img.height
+            });
             
+            // Configure image
             img.set({
               selectable: false,
               evented: false,
             });
             
             // Scale image to fit canvas
-            const scale = Math.min(
-              fabricCanvas.width / img.width,
-              fabricCanvas.height / img.height
-            );
+            const scaleX = fabricCanvas.width / img.width;
+            const scaleY = fabricCanvas.height / img.height;
+            const scale = Math.min(scaleX, scaleY);
             
+            console.log('Scaling image by factor:', scale);
             img.scale(scale);
+            
+            // Center the image
             img.center();
             
+            // Add to canvas and render
             fabricCanvas.add(img);
             fabricCanvas.renderAll();
             
+            console.log('Image added to canvas and rendered');
             setLoading(false);
           },
-          { crossOrigin: 'anonymous' }
+          {
+            crossOrigin: 'anonymous',
+            onError: (err) => {
+              console.error('Error loading image:', err);
+              setError(`Failed to load image: ${err.message}`);
+              setLoading(false);
+            }
+          }
         );
 
         // Configure brush settings.
@@ -170,13 +195,19 @@ const MaskEditor = () => {
   };
 
   if (error) {
-    return <div className="text-red-500">Error: {error}</div>;
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-900">
+        <div className="text-red-500 p-4 bg-gray-800 rounded-lg">
+          Error: {error}
+        </div>
+      </div>
+    );
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-900">
-        <div className="text-xl text-white">Loading editor...</div>
+        <div className="text-white">Loading editor...</div>
       </div>
     );
   }
