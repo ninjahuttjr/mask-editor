@@ -285,45 +285,59 @@ const MaskEditor = () => {
       const height = canvas.getHeight();
       console.log('Canvas dimensions:', { width, height });
 
-      // Create a new canvas for the mask only
+      // Create a simple 2D canvas for the mask
       const maskCanvas = document.createElement('canvas');
       maskCanvas.width = width;
       maskCanvas.height = height;
       const ctx = maskCanvas.getContext('2d');
 
-      // Set background to black
+      // Fill with black background
       ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, width, height);
+
+      // Draw the paths directly to the 2D context
       ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
 
-      // Get all paths from the fabric canvas
       const objects = canvas.getObjects();
-      console.log('Number of objects to process:', objects.length);
+      console.log('Processing', objects.length, 'objects');
 
-      // Create a temporary fabric canvas for rendering the mask
-      const tempFabric = new fabric.Canvas(maskCanvas);
-      tempFabric.setWidth(width);
-      tempFabric.setHeight(height);
-
-      // Add only the paths (not background) to temp canvas
       objects.forEach(obj => {
         if (obj.type === 'path') {
-          const clonedPath = fabric.util.object.clone(obj);
-          clonedPath.stroke = obj.stroke === '#2d3748' ? '#000000' : '#ffffff';
-          clonedPath.opacity = 1;
-          tempFabric.add(clonedPath);
+          const path = obj.path;
+          if (!path) return;
+
+          ctx.beginPath();
+          path.forEach((cmd, i) => {
+            if (cmd[0] === 'M') {
+              ctx.moveTo(cmd[1], cmd[2]);
+            } else if (cmd[0] === 'L') {
+              ctx.lineTo(cmd[1], cmd[2]);
+            } else if (cmd[0] === 'Q') {
+              ctx.quadraticCurveTo(cmd[1], cmd[2], cmd[3], cmd[4]);
+            }
+          });
+          
+          if (obj.stroke === '#2d3748') {
+            ctx.strokeStyle = '#000000';
+          } else {
+            ctx.strokeStyle = '#ffffff';
+          }
+          
+          ctx.stroke();
         }
       });
 
-      tempFabric.renderAll();
-      console.log('Rendered mask to temporary canvas');
+      console.log('Finished drawing paths');
 
       // Get the mask data
       const maskData = maskCanvas.toDataURL('image/png');
       console.log('Generated mask data, length:', maskData.length);
 
       // Clean up
-      tempFabric.dispose();
       maskCanvas.remove();
 
       console.log('Sending save request...');
