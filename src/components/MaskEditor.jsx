@@ -75,12 +75,25 @@ const MaskEditor = () => {
 
     // For portrait images (taller than wide)
     if (height > width) {
+      // Start with max height
       newHeight = maxSize;
-      newWidth = Math.floor(maxSize * (width / height));
+      newWidth = Math.round(maxSize * aspectRatio);
+      
+      // If width is too large, scale down proportionally
+      if (newWidth > maxSize) {
+        newWidth = maxSize;
+        newHeight = Math.round(maxSize / aspectRatio);
+      }
     } else {
-      // For landscape or square images
+      // For landscape, start with max width
       newWidth = maxSize;
-      newHeight = Math.floor(maxSize * (height / width));
+      newHeight = Math.round(maxSize / aspectRatio);
+      
+      // If height is too large, scale down proportionally
+      if (newHeight > maxSize) {
+        newHeight = maxSize;
+        newWidth = Math.round(maxSize * aspectRatio);
+      }
     }
 
     console.log('New calculated dimensions:', { 
@@ -90,10 +103,7 @@ const MaskEditor = () => {
       originalAspectRatio: width/height 
     });
     
-    return { 
-      width: newWidth, 
-      height: newHeight 
-    };
+    return { width: newWidth, height: newHeight };
   };
 
   // Use layout effect to initialize canvas after DOM updates
@@ -250,12 +260,25 @@ const MaskEditor = () => {
         quality: 1,
         multiplier: 1,
       });
+      
       const response = await fetch(`${WORKER_URL}/api/save-mask`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          // Add mode: 'cors' to explicitly request CORS
+          'Accept': 'application/json'
+        },
+        mode: 'cors',
+        credentials: 'include',
         body: JSON.stringify({ sessionId, maskData }),
       });
-      if (!response.ok) throw new Error('Failed to save mask');
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to save mask: ${errorText}`);
+      }
+      
+      // Only close if save was successful
       window.close();
     } catch (error) {
       console.error('Error saving mask:', error);
