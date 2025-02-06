@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useLayoutEffect } from 'react';
 import { fabric } from 'fabric';
 import Toolbar from './Toolbar';
 import { WORKER_URL } from '../config';
@@ -21,6 +21,7 @@ const MaskEditor = () => {
   const sessionId = window.location.pathname.split('/').pop();
   const [sessionData, setSessionData] = useState(null);
   const [dimensions, setDimensions] = useState({ width: 512, height: 512 });
+  const [canvasReady, setCanvasReady] = useState(false);
 
   // First effect: Fetch session data
   useEffect(() => {
@@ -51,30 +52,47 @@ const MaskEditor = () => {
     fetchSessionData();
   }, [sessionId]);
 
+  // Use Layout Effect to check canvas mounting
+  useLayoutEffect(() => {
+    if (canvasRef.current) {
+      console.log('Canvas element mounted:', canvasRef.current);
+      setCanvasReady(true);
+    }
+  }, []);
+
   // Second effect: Initialize canvas after session data is loaded and canvas is mounted
   useEffect(() => {
-    if (!sessionData || !canvasRef.current) {
-      console.log('Waiting for canvas element and session data...', {
+    if (!sessionData || !canvasReady) {
+      console.log('Waiting for initialization...', {
         hasSessionData: !!sessionData,
-        hasCanvasRef: !!canvasRef.current
+        isCanvasReady: canvasReady,
+        canvasElement: canvasRef.current
       });
       return;
     }
 
-    console.log('Initializing canvas with dimensions:', dimensions);
+    console.log('Starting canvas initialization...');
     let fabricCanvas = null;
 
     const initializeCanvas = async () => {
       try {
+        const canvasEl = canvasRef.current;
+        console.log('Canvas element dimensions:', {
+          width: canvasEl.width,
+          height: canvasEl.height,
+          offsetWidth: canvasEl.offsetWidth,
+          offsetHeight: canvasEl.offsetHeight
+        });
+
         // Initialize Fabric canvas
-        fabricCanvas = new fabric.Canvas(canvasRef.current, {
+        fabricCanvas = new fabric.Canvas(canvasEl, {
           isDrawingMode: true,
           width: dimensions.width,
           height: dimensions.height,
           backgroundColor: '#2d3748'
         });
 
-        console.log('Fabric canvas initialized');
+        console.log('Fabric canvas initialized:', fabricCanvas);
 
         // Configure brush settings
         const brush = new fabric.PencilBrush(fabricCanvas);
@@ -136,7 +154,7 @@ const MaskEditor = () => {
         fabricCanvas.dispose();
       }
     };
-  }, [sessionData, dimensions, brushSize]);
+  }, [sessionData, canvasReady, dimensions, brushSize]);
 
   // History management.
   const addToHistory = (canvasState) => {
@@ -245,7 +263,7 @@ const MaskEditor = () => {
           ref={canvasRef}
           width={dimensions.width}
           height={dimensions.height}
-          className="shadow-lg"
+          className="shadow-lg bg-gray-800"
         />
       </div>
     </div>
