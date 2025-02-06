@@ -36,15 +36,22 @@ const MaskEditor = () => {
         const data = await response.json();
         console.log('Session data received:', data);
 
-        // Validate image dimensions
+        // First set the session data
+        setSessionData(data);
+
+        // Then get the actual image dimensions
         const imageDimensions = await getImageDimensions(data.imageUrl);
+        console.log('Actual image dimensions:', imageDimensions);
+
+        // Calculate new dimensions based on actual image size
         const scaledDimensions = calculateScaledDimensions(
           imageDimensions.width,
           imageDimensions.height
         );
         
+        console.log('Setting final dimensions:', scaledDimensions);
         setDimensions(scaledDimensions);
-        setSessionData(data);
+        setLoading(false);
       } catch (error) {
         console.error('Session fetch failed:', error);
         setError(error.message);
@@ -57,47 +64,52 @@ const MaskEditor = () => {
 
   // Calculate scaled dimensions to fit within max size while maintaining aspect ratio
   const calculateScaledDimensions = (width, height, maxSize = 512) => {
+    console.log('Input dimensions:', { width, height, maxSize });
+    
+    // Force dimensions to be numbers
+    width = Number(width);
+    height = Number(height);
+    
     const aspectRatio = width / height;
     let newWidth, newHeight;
 
-    if (width > height) {
-      // Landscape orientation
-      newWidth = maxSize;
-      newHeight = Math.round(maxSize / aspectRatio);
+    // For portrait images (taller than wide)
+    if (height > width) {
+      newHeight = maxSize;
+      newWidth = Math.floor(maxSize * (width / height));
     } else {
-      // Portrait orientation
-      newHeight = maxSize;
-      newWidth = Math.round(maxSize * aspectRatio);
-    }
-
-    // Ensure dimensions don't exceed maxSize
-    if (newWidth > maxSize) {
+      // For landscape or square images
       newWidth = maxSize;
-      newHeight = Math.round(maxSize / aspectRatio);
-    } else if (newHeight > maxSize) {
-      newHeight = maxSize;
-      newWidth = Math.round(maxSize * aspectRatio);
+      newHeight = Math.floor(maxSize * (height / width));
     }
 
-    console.log('Calculated dimensions:', { newWidth, newHeight, aspectRatio });
-    return { width: newWidth, height: newHeight };
+    console.log('New calculated dimensions:', { 
+      newWidth, 
+      newHeight, 
+      aspectRatio,
+      originalAspectRatio: width/height 
+    });
+    
+    return { 
+      width: newWidth, 
+      height: newHeight 
+    };
   };
 
   // Use layout effect to initialize canvas after DOM updates
   useLayoutEffect(() => {
-    if (!sessionData || !containerRef.current) return;
+    if (!sessionData || !containerRef.current || !dimensions.width || !dimensions.height) {
+      console.log('Waiting for all required data...');
+      return;
+    }
 
-    console.log('Container mounted, initializing canvas');
+    console.log('Initializing canvas with dimensions:', dimensions);
     
     const canvasEl = document.createElement('canvas');
-    // Use exact dimensions from sessionData if available, otherwise use calculated dimensions
-    const canvasWidth = sessionData.width || dimensions.width;
-    const canvasHeight = sessionData.height || dimensions.height;
-    
-    canvasEl.width = canvasWidth;
-    canvasEl.height = canvasHeight;
-    canvasEl.style.width = `${canvasWidth}px`;
-    canvasEl.style.height = `${canvasHeight}px`;
+    canvasEl.width = dimensions.width;
+    canvasEl.height = dimensions.height;
+    canvasEl.style.width = `${dimensions.width}px`;
+    canvasEl.style.height = `${dimensions.height}px`;
     canvasEl.className = 'rounded-lg';
     
     containerRef.current.innerHTML = '';
@@ -107,8 +119,8 @@ const MaskEditor = () => {
     // Initialize Fabric canvas
     const fabricCanvas = new fabric.Canvas(canvasEl, {
       isDrawingMode: true,
-      width: canvasWidth,
-      height: canvasHeight,
+      width: dimensions.width,
+      height: dimensions.height,
       backgroundColor: '#2d3748'
     });
 
@@ -132,12 +144,12 @@ const MaskEditor = () => {
         console.log('Image loaded:', {
           imgWidth: img.width,
           imgHeight: img.height,
-          canvasWidth: canvasWidth,
-          canvasHeight: canvasHeight
+          canvasWidth: dimensions.width,
+          canvasHeight: dimensions.height
         });
 
-        const scaleX = canvasWidth / img.width;
-        const scaleY = canvasHeight / img.height;
+        const scaleX = dimensions.width / img.width;
+        const scaleY = dimensions.height / img.height;
         const scale = Math.min(scaleX, scaleY);
         
         img.set({
@@ -145,8 +157,8 @@ const MaskEditor = () => {
           scaleY: scale,
           selectable: false,
           evented: false,
-          left: (canvasWidth - (img.width * scale)) / 2,
-          top: (canvasHeight - (img.height * scale)) / 2
+          left: (dimensions.width - (img.width * scale)) / 2,
+          top: (dimensions.height - (img.height * scale)) / 2
         });
 
         fabricCanvas.setBackgroundImage(img, () => {
