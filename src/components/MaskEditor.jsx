@@ -417,13 +417,15 @@ const MaskEditor = () => {
         maskUrl={maskUrl}
         showSaveSuccess={showSaveSuccess}
       />
-      <div className="flex-1 p-4 flex items-center justify-center">
+      <div className="flex-1 p-4 flex items-center justify-center overflow-hidden">
         <div 
           ref={containerRef}
-          className="bg-gray-800 rounded-lg shadow-lg overflow-hidden"
+          className="bg-gray-800 rounded-lg shadow-lg overflow-hidden max-w-full max-h-full"
           style={{ 
             width: `${dimensions.width}px`,
-            height: `${dimensions.height}px`
+            height: `${dimensions.height}px`,
+            transform: 'scale(var(--canvas-scale))',
+            transformOrigin: 'center center'
           }}
         />
       </div>
