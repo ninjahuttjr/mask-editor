@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Brush, Eraser, Undo2, Redo2, Save, Menu, X } from 'lucide-react';
+import React from 'react';
+import { Brush, Eraser, Undo2, Redo2, Save } from 'lucide-react';
 
 const Toolbar = ({
   mode,
@@ -15,8 +15,6 @@ const Toolbar = ({
   maskUrl,
   showSaveSuccess
 }) => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-
   const copyToClipboard = async () => {
     try {
       await navigator.clipboard.writeText(maskUrl);
@@ -27,29 +25,53 @@ const Toolbar = ({
     }
   };
 
-  const MobileMenu = () => (
-    <div className="fixed inset-0 bg-gray-900 bg-opacity-75 z-50">
-      <div className="bg-gray-800 h-full w-64 p-4">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-white text-lg">Tools</h2>
-          <button onClick={() => setIsMenuOpen(false)}>
-            <X className="w-6 h-6 text-white" />
+  const SaveButton = () => {
+    if (isSaving) {
+      return (
+        <div className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg">
+          <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>Saving mask...</span>
+        </div>
+      );
+    }
+
+    if (showSaveSuccess && maskUrl) {
+      return (
+        <div className="flex flex-col gap-2">
+          <div className="text-green-400 text-sm mb-2">
+            Mask saved successfully!
+          </div>
+          <input
+            type="text"
+            value={maskUrl}
+            readOnly
+            className="bg-gray-700 text-white px-3 py-2 rounded-lg w-full text-sm"
+          />
+          <button
+            onClick={copyToClipboard}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+          >
+            Copy URL
           </button>
         </div>
-        <div className="flex flex-col gap-4">
-          {/* Tool buttons */}
-          <ToolButtons />
-          {/* Brush size control */}
-          <BrushSizeControl />
-          {/* Save button */}
-          <SaveButton />
-        </div>
-      </div>
-    </div>
-  );
+      );
+    }
 
-  const ToolButtons = () => (
-    <>
+    return (
+      <button
+        onClick={onSave}
+        className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white"
+      >
+        Save Mask
+      </button>
+    );
+  };
+
+  return (
+    <div className="flex items-center gap-4 p-4 bg-gray-800">
       <button
         className={`p-2 rounded ${mode === 'brush' ? 'bg-blue-500' : 'bg-gray-700'}`}
         onClick={() => onModeChange('brush')}
@@ -63,6 +85,19 @@ const Toolbar = ({
       >
         <Eraser className="w-6 h-6" />
       </button>
+
+      <div className="flex items-center gap-2 text-white">
+        <span>Brush Size:</span>
+        <input
+          type="range"
+          min="1"
+          max="100"
+          value={brushSize}
+          onChange={(e) => onBrushSizeChange(Number(e.target.value))}
+          className="w-32"
+        />
+        <span>{brushSize}px</span>
+      </div>
 
       <button
         className={`p-2 rounded ${canUndo ? 'bg-gray-700' : 'bg-gray-900 opacity-50'}`}
@@ -79,77 +114,11 @@ const Toolbar = ({
       >
         <Redo2 className="w-6 h-6" />
       </button>
-    </>
-  );
 
-  const BrushSizeControl = () => (
-    <div className="flex flex-col gap-2 text-white">
-      <span>Brush Size: {brushSize}px</span>
-      <input
-        type="range"
-        min="1"
-        max="100"
-        value={brushSize}
-        onChange={(e) => onBrushSizeChange(Number(e.target.value))}
-        className="w-full"
-      />
+      <div className="flex-grow"></div>
+
+      <SaveButton />
     </div>
-  );
-
-  const SaveButton = () => (
-    showSaveSuccess && maskUrl ? (
-      <div className="flex flex-col gap-2">
-        <input
-          type="text"
-          value={maskUrl}
-          readOnly
-          className="bg-gray-700 text-white px-3 py-2 rounded-lg w-full text-sm"
-        />
-        <button
-          onClick={copyToClipboard}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-        >
-          Copy URL
-        </button>
-      </div>
-    ) : (
-      <button
-        onClick={onSave}
-        disabled={isSaving}
-        className={`px-4 py-2 rounded-lg ${
-          isSaving 
-            ? 'bg-gray-500 cursor-not-allowed' 
-            : 'bg-green-600 hover:bg-green-700'
-        } text-white`}
-      >
-        {isSaving ? 'Saving...' : 'Save'}
-      </button>
-    )
-  );
-
-  return (
-    <>
-      {/* Mobile menu button */}
-      <div className="md:hidden fixed top-4 left-4 z-50">
-        <button
-          onClick={() => setIsMenuOpen(true)}
-          className="p-2 bg-gray-800 rounded-lg"
-        >
-          <Menu className="w-6 h-6 text-white" />
-        </button>
-      </div>
-
-      {/* Mobile menu */}
-      {isMenuOpen && <MobileMenu />}
-
-      {/* Desktop toolbar */}
-      <div className="hidden md:flex items-center gap-4 p-4 bg-gray-800">
-        <ToolButtons />
-        <BrushSizeControl />
-        <div className="flex-grow" />
-        <SaveButton />
-      </div>
-    </>
   );
 };
 

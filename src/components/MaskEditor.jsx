@@ -24,6 +24,7 @@ const MaskEditor = () => {
   const [dimensions, setDimensions] = useState({ width: 512, height: 512 });
   const [maskUrl, setMaskUrl] = useState(null);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState(null);
 
   // First effect: Fetch session data
   useEffect(() => {
@@ -282,6 +283,7 @@ const MaskEditor = () => {
     
     try {
       setIsSaving(true);
+      setError(null);
       const sessionId = window.location.pathname.split('/').pop();
       
       // Get original image dimensions from sessionData
@@ -366,15 +368,15 @@ const MaskEditor = () => {
       }
 
       const result = await response.json();
-      console.log('Save response:', result);
-
+      
       if (result.error) {
         throw new Error(result.error);
       }
 
       setMaskUrl(result.maskUrl);
       setShowSaveSuccess(true);
-
+      setSuccessMessage("Mask saved successfully! Processing will begin shortly in Discord.");
+      
     } catch (error) {
       console.error('Save error:', error);
       setError(`Failed to save mask: ${error.message}`);
@@ -439,6 +441,11 @@ const MaskEditor = () => {
           <div className="bg-gray-800 p-4 rounded-lg text-white">
             Saving mask...
           </div>
+        </div>
+      )}
+      {successMessage && (
+        <div className="fixed bottom-4 left-4 right-4 bg-green-500 text-white p-4 rounded-lg text-center">
+          {successMessage}
         </div>
       )}
     </div>
