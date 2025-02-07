@@ -25,6 +25,7 @@ const MaskEditor = () => {
   const [maskUrl, setMaskUrl] = useState(null);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState(null);
+  const [processingStatus, setProcessingStatus] = useState(null);
 
   // First effect: Fetch session data
   useEffect(() => {
@@ -374,12 +375,14 @@ const MaskEditor = () => {
       }
 
       setMaskUrl(result.maskUrl);
+      // Show immediate success and processing message
       setShowSaveSuccess(true);
-      setSuccessMessage("Mask saved successfully! Processing will begin shortly in Discord.");
+      setProcessingStatus('processing');
       
     } catch (error) {
       console.error('Save error:', error);
       setError(`Failed to save mask: ${error.message}`);
+      setProcessingStatus('error');
     } finally {
       setIsSaving(false);
     }
@@ -418,6 +421,7 @@ const MaskEditor = () => {
         isSaving={isSaving}
         maskUrl={maskUrl}
         showSaveSuccess={showSaveSuccess}
+        processingStatus={processingStatus}
       />
       <div className="flex-1 p-4 flex items-center justify-center overflow-hidden">
         <div 
