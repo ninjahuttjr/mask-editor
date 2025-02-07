@@ -6,15 +6,21 @@
   --canvas-scale: 1;
 }
 
-@media (max-width: 768px) {
+@media screen and (max-width: 768px), screen and (max-height: 768px) {
   :root {
     --canvas-scale: 0.8;
   }
 }
 
-@media (max-width: 480px) {
+@media screen and (max-width: 480px), screen and (max-height: 480px) {
   :root {
-    --canvas-scale: 0.6;
+    --canvas-scale: 0.5;
+  }
+}
+
+@media screen and (max-width: 320px), screen and (max-height: 320px) {
+  :root {
+    --canvas-scale: 0.4;
   }
 }
 

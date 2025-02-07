@@ -26,6 +26,7 @@ const MaskEditor = () => {
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState(null);
   const [processingStatus, setProcessingStatus] = useState(null);
+  const [canvasState, setCanvasState] = useState(null);
 
   // First effect: Fetch session data
   useEffect(() => {
@@ -261,12 +262,26 @@ const MaskEditor = () => {
     }
   };
 
-  // Update brush width when brushSize changes.
+  // Add this effect to save canvas state before brush size changes
   useEffect(() => {
     if (canvas) {
-      canvas.freeDrawingBrush.width = brushSize;
+      setCanvasState(JSON.stringify(canvas.toJSON()));
     }
-  }, [brushSize, canvas]);
+  }, [canvas]);
+
+  // Modify the brush size effect
+  useEffect(() => {
+    if (canvas) {
+      if (canvasState) {
+        canvas.loadFromJSON(canvasState, () => {
+          canvas.freeDrawingBrush.width = brushSize;
+          canvas.renderAll();
+        });
+      } else {
+        canvas.freeDrawingBrush.width = brushSize;
+      }
+    }
+  }, [brushSize, canvas, canvasState]);
 
   const handleModeChange = (newMode) => {
     setMode(newMode);
