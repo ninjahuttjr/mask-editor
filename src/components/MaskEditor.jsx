@@ -286,26 +286,22 @@ const MaskEditor = () => {
       setIsSaving(true);
       setError(null);
       const sessionId = window.location.pathname.split('/').pop();
+
+      console.log('Creating mask at original dimensions:', { originalWidth: sessionData.width, originalHeight: sessionData.height });
       
-      // Get original image dimensions from sessionData
-      const originalWidth = sessionData.width;
-      const originalHeight = sessionData.height;
-
-      console.log('Creating mask at original dimensions:', { originalWidth, originalHeight });
-
       // Create a temporary canvas at original image dimensions
       const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = originalWidth;
-      tempCanvas.height = originalHeight;
+      tempCanvas.width = sessionData.width;
+      tempCanvas.height = sessionData.height;
       const ctx = tempCanvas.getContext('2d');
 
       // Fill with black background (represents unmasked areas)
       ctx.fillStyle = '#000000';
-      ctx.fillRect(0, 0, originalWidth, originalHeight);
+      ctx.fillRect(0, 0, sessionData.width, sessionData.height);
 
       // Scale factor between editor canvas and original image
-      const scaleX = originalWidth / dimensions.width;
-      const scaleY = originalHeight / dimensions.height;
+      const scaleX = sessionData.width / dimensions.width;
+      const scaleY = sessionData.height / dimensions.height;
 
       console.log('Using scale factors:', { scaleX, scaleY });
 
@@ -354,7 +350,7 @@ const MaskEditor = () => {
 
       console.log('Generated mask data, length:', maskData.length);
 
-      // Save mask
+      console.log('Sending save request to worker');
       const response = await fetch(`${WORKER_URL}/api/save-mask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -369,21 +365,35 @@ const MaskEditor = () => {
       }
 
       const result = await response.json();
+      console.log('Save response:', result);
       
       if (result.error) {
         throw new Error(result.error);
       }
 
-      setMaskUrl(result.maskUrl);
-      // Show immediate success and processing message
+      // Important: Update these states AFTER we get a successful response
+      setIsSaving(false);
       setShowSaveSuccess(true);
-      setProcessingStatus('processing');
+      
+      // Show a notification that will auto-close the window
+      const notification = document.createElement('div');
+      notification.className = 'fixed top-4 right-4 left-4 bg-green-500 text-white p-4 rounded-lg text-center';
+      notification.innerHTML = `
+        <div class="flex flex-col gap-2">
+          <div>Mask saved successfully! Processing will continue in Discord...</div>
+          <div class="text-sm">This window will close in 3 seconds</div>
+        </div>
+      `;
+      document.body.appendChild(notification);
+
+      // Auto-close after 3 seconds
+      setTimeout(() => {
+        window.close();
+      }, 3000);
       
     } catch (error) {
       console.error('Save error:', error);
       setError(`Failed to save mask: ${error.message}`);
-      setProcessingStatus('error');
-    } finally {
       setIsSaving(false);
     }
   };
