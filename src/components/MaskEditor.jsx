@@ -27,6 +27,7 @@ const MaskEditor = () => {
   const [successMessage, setSuccessMessage] = useState(null);
   const [processingStatus, setProcessingStatus] = useState(null);
   const [canvasState, setCanvasState] = useState(null);
+  const [prompt, setPrompt] = useState('');
 
   // First effect: Fetch session data
   useEffect(() => {
@@ -371,7 +372,8 @@ const MaskEditor = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           sessionId, 
-          maskData
+          maskData,
+          prompt
         })
       });
 
@@ -433,6 +435,15 @@ const MaskEditor = () => {
 
   return (
     <div className="flex flex-col h-screen bg-gray-900">
+      <div className="bg-gray-800 p-4">
+        <input
+          type="text"
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          placeholder="Enter prompt for inpainting..."
+          className="w-full p-2 rounded bg-gray-700 text-white"
+        />
+      </div>
       <Toolbar
         mode={mode}
         onModeChange={handleModeChange}

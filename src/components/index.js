@@ -7,7 +7,7 @@ function generateUUID() {
       try {
         const url = new URL(request.url);
         const corsHeaders = {
-          'Access-Control-Allow-Origin': 'https://mask-editor.pages.dev',
+          'Access-Control-Allow-Origin': '*', // Temporarily allow all origins
           'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type, Origin',
           'Access-Control-Max-Age': '86400',
@@ -63,12 +63,12 @@ function generateUUID() {
   };
   
   async function getImageDimensions(imageBuffer) {
-    const imageBlob = new Blob([imageBuffer], { type: 'image/png' });
-    const imageBitmap = await createImageBitmap(imageBlob);
-    return {
-      width: imageBitmap.width,
-      height: imageBitmap.height
-    };
+    // Simple PNG dimension parsing
+    // PNG files start with an IHDR chunk that contains dimensions
+    const view = new DataView(imageBuffer);
+    const width = view.getUint32(16);
+    const height = view.getUint32(20);
+    return { width, height };
   }
   
   async function handleStartSession(request, env, corsHeaders) {
@@ -77,24 +77,8 @@ function generateUUID() {
     let imageBuffer;
   
     try {
-      if (data.image_url) {
-        console.log("Starting session. Fetching image from:", data.image_url);
-        let modifiedUrl = data.image_url.replace("cdn.discordapp.com", "media.discordapp.net");
-        const imageResponse = await fetch(modifiedUrl, {
-          headers: {
-            "User-Agent": "Mozilla/5.0 (compatible; CloudflareWorker)",
-            "Referer": "https://discord.com",
-            "Accept": "image/webp,image/apng,image/*,*/*;q=0.8"
-          },
-          redirect: "follow"
-        });
-        
-        if (!imageResponse.ok) {
-          throw new Error(`Failed to fetch image: ${imageResponse.status}`);
-        }
-  
-        imageBuffer = await imageResponse.arrayBuffer();
-      } else if (data.image_data) {
+      // Handle image data
+      if (data.image_data) {
         console.log("Using provided image data");
         let base64Data = data.image_data;
         const commaIndex = base64Data.indexOf(',');
@@ -108,7 +92,7 @@ function generateUUID() {
         }
         imageBuffer = bytes.buffer;
       } else {
-        throw new Error("No image_data or image_url provided");
+        throw new Error("No image_data provided");
       }
   
       if (imageBuffer.byteLength < 100) {
@@ -127,6 +111,7 @@ function generateUUID() {
         },
       });
   
+      // Store session with metadata
       const session = {
         id: sessionId,
         imagePath,
@@ -136,6 +121,7 @@ function generateUUID() {
         discordUserId: data.discord_user_id,
         channelId: data.channel_id,
         messageId: data.message_id,
+        metadata: data.metadata || {}, // Store the metadata from the request
       };
   
       await env.SESSIONS.put(sessionId, JSON.stringify(session), {
@@ -212,9 +198,11 @@ function generateUUID() {
   async function handleSaveMask(request, env, corsHeaders) {
     try {
       const data = await request.json();
+      console.log('Received save mask request for session:', data.sessionId);
+      
       const sessionData = await env.SESSIONS.get(data.sessionId);
-  
       if (!sessionData) {
+        console.error('Session not found:', data.sessionId);
         return new Response(JSON.stringify({ error: 'Session not found' }), { 
           status: 404,
           headers: {
@@ -225,6 +213,7 @@ function generateUUID() {
       }
   
       const session = JSON.parse(sessionData);
+      console.log('Found session:', session);
   
       // Convert base64 to Uint8Array
       const maskData = data.maskData.split(',')[1];
@@ -235,6 +224,7 @@ function generateUUID() {
       }
   
       const maskPath = `masks/${data.sessionId}.png`;
+      console.log('Saving mask to:', maskPath);
       
       await env.IMAGE_BUCKET.put(maskPath, bytes, {
         httpMetadata: { 
@@ -247,7 +237,46 @@ function generateUUID() {
       });
   
       const maskUrl = `${new URL(request.url).origin}/storage/${maskPath}`;
+      console.log('Generated mask URL:', maskUrl);
       
+      // Send webhook to Discord bot
+      try {
+        if (!env.DISCORD_BOT_WEBHOOK_URL) {
+          throw new Error('Discord bot webhook URL not configured');
+        }
+        console.log('Sending webhook to:', env.DISCORD_BOT_WEBHOOK_URL);
+        
+        const webhookPayload = {
+          sessionId: data.sessionId,
+          maskUrl: maskUrl,
+          metadata: session.metadata,
+          discordUserId: session.discordUserId,
+          channelId: session.channelId,
+          messageId: session.messageId,
+          prompt: data.prompt  // Include the prompt in webhook payload
+        };
+        console.log('Webhook payload:', webhookPayload);
+  
+        const webhookResponse = await fetch(env.DISCORD_BOT_WEBHOOK_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(webhookPayload),
+        });
+  
+        console.log('Webhook response status:', webhookResponse.status);
+        const responseText = await webhookResponse.text();
+        console.log('Webhook response:', responseText);
+  
+        if (!webhookResponse.ok) {
+          throw new Error(`Webhook failed with status ${webhookResponse.status}: ${responseText}`);
+        }
+      } catch (webhookError) {
+        console.error('Webhook error:', webhookError);
+        // Continue even if webhook fails - don't block the user
+      }
+  
       return new Response(JSON.stringify({
         status: 'success',
         maskUrl,
