@@ -370,12 +370,9 @@ const MaskEditor = () => {
       const response = await fetch(`${WORKER_URL}/api/save-mask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          sessionId, 
-          maskData,
-          prompt
-        })
+        body: JSON.stringify({ sessionId, maskData, prompt })
       });
+      
 
       if (!response.ok) {
         throw new Error(`Save failed: ${response.statusText}`);
