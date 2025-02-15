@@ -263,26 +263,13 @@ const MaskEditor = () => {
     }
   };
 
-  // Add this effect to save canvas state before brush size changes
+  // Modify brush size without reloading canvas state
   useEffect(() => {
-    if (canvas) {
-      setCanvasState(JSON.stringify(canvas.toJSON()));
+    if (canvas && canvas.freeDrawingBrush) {
+      canvas.freeDrawingBrush.width = brushSize;
+      canvas.freeDrawingBrush.color = mode === 'eraser' ? '#2d3748' : '#ffffff';
     }
-  }, [canvas]);
-
-  // Modify the brush size effect
-  useEffect(() => {
-    if (canvas) {
-      if (canvasState) {
-        canvas.loadFromJSON(canvasState, () => {
-          canvas.freeDrawingBrush.width = brushSize;
-          canvas.renderAll();
-        });
-      } else {
-        canvas.freeDrawingBrush.width = brushSize;
-      }
-    }
-  }, [brushSize, canvas, canvasState]);
+  }, [brushSize, canvas, mode]);
 
   const handleModeChange = (newMode) => {
     setMode(newMode);

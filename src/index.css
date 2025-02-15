@@ -4,26 +4,38 @@
 
 :root {
   --canvas-scale: 1;
+  touch-action: none;
 }
 
+/* Prevent pull-to-refresh and other gestures */
+body {
+  overscroll-behavior: none;
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+}
+
+/* Improved mobile scaling */
 @media screen and (max-width: 768px), screen and (max-height: 768px) {
   :root {
-    --canvas-scale: 0.8;
+    --canvas-scale: 0.9;
   }
 }
 
 @media screen and (max-width: 480px), screen and (max-height: 480px) {
   :root {
-    --canvas-scale: 0.5;
+    --canvas-scale: 0.7;
   }
 }
 
 @media screen and (max-width: 320px), screen and (max-height: 320px) {
   :root {
-    --canvas-scale: 0.4;
+    --canvas-scale: 0.5;
   }
 }
 
+/* Canvas container styles */
 .canvas-container {
   position: absolute !important;
   top: 50% !important;
@@ -38,4 +50,19 @@
 
 .canvas-container canvas {
   border-radius: 0.5rem;
+  touch-action: none;
+}
+
+/* Mobile-friendly toolbar adjustments */
+@media (max-width: 640px) {
+  .toolbar-container {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+  
+  .brush-size-control {
+    width: 100%;
+    order: -1;
+  }
 }
