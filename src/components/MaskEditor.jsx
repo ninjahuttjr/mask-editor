@@ -142,23 +142,23 @@ const MaskEditor = () => {
       isDrawingMode: true,
       width: dimensions.width,
       height: dimensions.height,
-      backgroundColor: '#2d3748'
+      backgroundColor: '#000000'
     });
 
-    // Configure brush with 100% opacity
+    // Configure brush for binary masking
     const brush = new fabric.PencilBrush(fabricCanvas);
-    brush.color = mode === 'eraser' ? '#2d3748' : '#ffffff';
+    brush.color = mode === 'eraser' ? '#000000' : '#ffffff';  // White for mask, black for eraser
     brush.width = brushSize;
-    brush.opacity = 1; // Force 100% opacity
+    brush.opacity = 1;
     fabricCanvas.freeDrawingBrush = brush;
 
-    // Ensure paths are created with full opacity
+    // Ensure paths are created with correct colors
     fabricCanvas.on('path:created', (e) => {
       const path = e.path;
       path.set({
         opacity: 1,
         strokeWidth: brushSize,
-        stroke: mode === 'eraser' ? '#2d3748' : '#ffffff'
+        stroke: mode === 'eraser' ? '#000000' : '#ffffff'  // White for mask, black for eraser
       });
       fabricCanvas.renderAll();
       const canvasState = JSON.stringify(fabricCanvas.toJSON());
@@ -272,7 +272,7 @@ const MaskEditor = () => {
   useEffect(() => {
     if (canvas && canvas.freeDrawingBrush) {
       canvas.freeDrawingBrush.width = brushSize;
-      canvas.freeDrawingBrush.color = mode === 'eraser' ? '#2d3748' : '#ffffff';
+      canvas.freeDrawingBrush.color = mode === 'eraser' ? '#000000' : '#ffffff';
     }
   }, [brushSize, canvas, mode]);
 
@@ -280,7 +280,7 @@ const MaskEditor = () => {
     setMode(newMode);
     if (canvas) {
       canvas.isDrawingMode = true;
-      canvas.freeDrawingBrush.color = newMode === 'eraser' ? '#2d3748' : '#ffffff';
+      canvas.freeDrawingBrush.color = newMode === 'eraser' ? '#000000' : '#ffffff';
       canvas.freeDrawingBrush.opacity = 1;
       canvas.renderAll();
     }
