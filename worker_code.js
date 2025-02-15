@@ -260,28 +260,29 @@ function generateUUID() {
   
       // Send webhook to Discord bot if the webhook URL is set
       if (env.DISCORD_BOT_WEBHOOK_URL) {
-        // Validate and normalize inpainting parameters
-        const parameters = {
-          denoise: Math.max(0.1, Math.min(1, data.parameters?.denoise || 0.75)),
-          steps: Math.max(10, Math.min(50, data.parameters?.steps || 30)),
-          guidance: Math.max(1, Math.min(20, data.parameters?.guidance || 7.5)),
-          scheduler: ['karras', 'euler_a', 'euler', 'ddim'].includes(data.parameters?.scheduler) 
-            ? data.parameters.scheduler 
-            : 'karras'
-        };
-  
         const webhookPayload = {
           sessionId: data.sessionId,
           maskUrl: maskUrl,
           prompt: data.prompt || "",
-          parameters,
+          parameters: {
+            denoise: Math.max(0.1, Math.min(1, data.parameters?.denoise || 0.75)),
+            steps: Math.max(10, Math.min(50, data.parameters?.steps || 30)),
+            guidance: Math.max(1, Math.min(20, data.parameters?.guidance || 7.5)),
+            scheduler: ['karras', 'euler_a', 'euler', 'ddim'].includes(data.parameters?.scheduler) 
+              ? data.parameters.scheduler 
+              : 'karras'
+          },
           metadata: data.metadata,
           discordUserId: data.discordUserId,
           channelId: data.channelId,
-          messageId: data.messageId
+          messageId: data.messageId,
+          status: {
+            type: 'inpainting_started',
+            message: 'Inpainting request received, processing will begin shortly...'
+          }
         };
   
-        console.log('Sending webhook with parameters:', parameters);
+        console.log('Sending webhook with payload:', webhookPayload);
   
         const webhookResponse = await fetch(env.DISCORD_BOT_WEBHOOK_URL, {
           method: 'POST',

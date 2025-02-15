@@ -321,21 +321,12 @@ const MaskEditor = () => {
 
       setShowSaveSuccess(true);
       
-      // Set success message and attempt to close
-      setSuccessMessage('Save successful! You can close this window.');
-      
-      // Attempt to close after delay
-      setTimeout(() => {
-        try {
-          window.close();
-        } catch (err) {
-          console.log('Could not close window automatically');
-        }
-      }, 2000);
+      // Close window immediately after successful save
+      window.close();
 
     } catch (error) {
       console.error('Error saving mask:', error);
-      setError(error.message);
+      setError('Failed to save mask: ' + error.message);
     } finally {
       setIsSaving(false);
     }
