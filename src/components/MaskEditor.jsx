@@ -3,45 +3,12 @@ import { fabric } from 'fabric';
 import Toolbar from './Toolbar';
 import { WORKER_URL } from '../config';
 
-// Utility functions
-const getImageDimensions = (url) => {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      resolve({
-        width: img.naturalWidth,
-        height: img.naturalHeight
-      });
-    };
-    img.onerror = () => reject(new Error('Failed to load image'));
-    img.src = url;
-    img.crossOrigin = 'anonymous';
-  });
-};
-
-const calculateScaledDimensions = (width, height, maxSize = 512) => {
-  width = Number(width);
-  height = Number(height);
-  const aspectRatio = width / height;
-
-  if (width <= maxSize && height <= maxSize) {
-    return { width, height };
-  }
-
-  if (width > height) {
-    return {
-      width: maxSize,
-      height: Math.round(maxSize / aspectRatio)
-    };
-  }
-
-  return {
-    width: Math.round(maxSize * aspectRatio),
-    height: maxSize
-  };
-};
+// Log when the component loads
+console.log('MaskEditor component loaded');
 
 const MaskEditor = () => {
+  console.log('MaskEditor component rendering');
+
   const [canvas, setCanvas] = useState(null);
   const [mode, setMode] = useState('brush');
   const [brushSize, setBrushSize] = useState(20);
@@ -49,28 +16,47 @@ const MaskEditor = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
-  const [error, setError] = useState(null);
-  const [prompt, setPrompt] = useState('');
-  const [dimensions, setDimensions] = useState({ width: 512, height: 512 });
-  const [sessionData, setSessionData] = useState(null);
-  
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
+  const [error, setError] = useState(null);
   const sessionId = window.location.pathname.split('/').pop();
+  const [sessionData, setSessionData] = useState(null);
+  const [dimensions, setDimensions] = useState({ width: 512, height: 512 });
+  const [maskUrl, setMaskUrl] = useState(null);
+  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState(null);
+  const [processingStatus, setProcessingStatus] = useState(null);
+  const [canvasState, setCanvasState] = useState(null);
+  const [prompt, setPrompt] = useState('');
 
-  // Fetch session data and initialize dimensions
+  // First effect: Fetch session data
   useEffect(() => {
     const fetchSessionData = async () => {
       try {
+        console.log('Fetching session data for:', sessionId);
         const response = await fetch(`${WORKER_URL}/api/session/${sessionId}`);
-        if (!response.ok) throw new Error('Failed to fetch session');
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch session: ${await response.text()}`);
+        }
+        
         const data = await response.json();
+        console.log('Session data received:', data);
+
+        // First set the session data
         setSessionData(data);
+
+        // Then get the actual image dimensions
         const imageDimensions = await getImageDimensions(data.imageUrl);
+        console.log('Actual image dimensions:', imageDimensions);
+
+        // Calculate new dimensions based on actual image size
         const scaledDimensions = calculateScaledDimensions(
           imageDimensions.width,
           imageDimensions.height
         );
+        
+        console.log('Setting final dimensions:', scaledDimensions);
         setDimensions(scaledDimensions);
         setLoading(false);
       } catch (error) {
@@ -83,115 +69,327 @@ const MaskEditor = () => {
     fetchSessionData();
   }, [sessionId]);
 
-  // Initialize Fabric canvas for mask drawing (without the background image)
-  useLayoutEffect(() => {
-    if (!sessionData || !containerRef.current) return;
+  // Calculate scaled dimensions to fit within max size while maintaining aspect ratio
+  const calculateScaledDimensions = (width, height, maxSize = 512) => {
+    console.log('Input dimensions:', { width, height, maxSize });
     
-    // Clear any existing canvas
-    if (canvasRef.current) {
-      containerRef.current.innerHTML = '';
+    // Force dimensions to be numbers
+    width = Number(width);
+    height = Number(height);
+    
+    const aspectRatio = width / height;
+    let newWidth, newHeight;
+
+    // For portrait images (taller than wide)
+    if (height > width) {
+      // Start with max height
+      newHeight = maxSize;
+      newWidth = Math.round(maxSize * aspectRatio);
+      
+      // If width is too large, scale down proportionally
+      if (newWidth > maxSize) {
+        newWidth = maxSize;
+        newHeight = Math.round(maxSize / aspectRatio);
+      }
+    } else {
+      // For landscape, start with max width
+      newWidth = maxSize;
+      newHeight = Math.round(maxSize / aspectRatio);
+      
+      // If height is too large, scale down proportionally
+      if (newHeight > maxSize) {
+        newHeight = maxSize;
+        newWidth = Math.round(maxSize * aspectRatio);
+      }
     }
 
+    console.log('New calculated dimensions:', { 
+      newWidth, 
+      newHeight, 
+      aspectRatio,
+      originalAspectRatio: width/height 
+    });
+    
+    return { width: newWidth, height: newHeight };
+  };
+
+  // Use layout effect to initialize canvas after DOM updates
+  useLayoutEffect(() => {
+    if (!sessionData || !containerRef.current || !dimensions.width || !dimensions.height) {
+      console.log('Waiting for all required data...');
+      return;
+    }
+
+    console.log('Initializing canvas with dimensions:', dimensions);
+    
     const canvasEl = document.createElement('canvas');
     canvasEl.width = dimensions.width;
     canvasEl.height = dimensions.height;
+    canvasEl.style.width = `${dimensions.width}px`;
+    canvasEl.style.height = `${dimensions.height}px`;
+    canvasEl.className = 'rounded-lg';
+    
+    containerRef.current.innerHTML = '';
     containerRef.current.appendChild(canvasEl);
     canvasRef.current = canvasEl;
 
-    // Create Fabric canvas with a black background
     const fabricCanvas = new fabric.Canvas(canvasEl, {
       isDrawingMode: true,
       width: dimensions.width,
       height: dimensions.height,
-      backgroundColor: '#000000'
+      backgroundColor: '#2d3748'
     });
 
-    // Set up brush for drawing white strokes (the mask)
+    // Configure brush with 100% opacity
     const brush = new fabric.PencilBrush(fabricCanvas);
-    brush.color = '#ffffff';
+    brush.color = mode === 'eraser' ? '#2d3748' : '#ffffff';
     brush.width = brushSize;
+    brush.opacity = 1; // Force 100% opacity
     fabricCanvas.freeDrawingBrush = brush;
 
-    // Initialize history for undo/redo
-    const initialState = JSON.stringify(fabricCanvas.toJSON());
-    setHistory([initialState]);
-    setHistoryIndex(0);
-    
-    fabricCanvas.on('path:created', () => {
-      const canvasState = JSON.stringify(fabricCanvas.toJSON());
-      setHistory(prev => {
-        const newHistory = [...prev.slice(0, historyIndex + 1), canvasState];
-        return newHistory.slice(-50);
+    // Ensure paths are created with full opacity
+    fabricCanvas.on('path:created', (e) => {
+      const path = e.path;
+      path.set({
+        opacity: 1,
+        strokeWidth: brushSize,
+        stroke: mode === 'eraser' ? '#2d3748' : '#ffffff'
       });
-      setHistoryIndex(prev => prev + 1);
+      fabricCanvas.renderAll();
+      const canvasState = JSON.stringify(fabricCanvas.toJSON());
+      addToHistory(canvasState);
     });
+
+    // Handle undo/redo state
+    const handleHistoryChange = () => {
+      const canvasState = JSON.stringify(fabricCanvas.toJSON());
+      addToHistory(canvasState);
+    };
+
+    fabricCanvas.on('object:added', handleHistoryChange);
+    fabricCanvas.on('object:modified', handleHistoryChange);
+    fabricCanvas.on('object:removed', handleHistoryChange);
+
+    // Load image
+    fabric.Image.fromURL(
+      sessionData.imageUrl,
+      (img) => {
+        if (!img) {
+          console.error('Failed to load image');
+          setError('Failed to load image');
+          setLoading(false);
+          return;
+        }
+
+        const scaleX = dimensions.width / img.width;
+        const scaleY = dimensions.height / img.height;
+        const scale = Math.min(scaleX, scaleY);
+        
+        img.set({
+          scaleX: scale,
+          scaleY: scale,
+          selectable: false,
+          evented: false,
+          left: (dimensions.width - (img.width * scale)) / 2,
+          top: (dimensions.height - (img.height * scale)) / 2
+        });
+
+        fabricCanvas.setBackgroundImage(img, () => {
+          fabricCanvas.renderAll();
+          console.log('Background image set');
+          
+          // Save initial state to history
+          const initialState = JSON.stringify(fabricCanvas.toJSON());
+          addToHistory(initialState);
+          
+          setLoading(false);
+        });
+      },
+      { crossOrigin: 'anonymous' }
+    );
 
     setCanvas(fabricCanvas);
 
     return () => {
       fabricCanvas.dispose();
     };
-  }, [sessionData, dimensions, brushSize]);
+  }, [sessionData, dimensions, brushSize, mode]);
 
-  // Update brush size when changed
-  useEffect(() => {
-    if (!canvas?.freeDrawingBrush) return;
-    canvas.freeDrawingBrush.width = brushSize;
-  }, [brushSize, canvas]);
+  // Utility function to get image dimensions
+  const getImageDimensions = (url) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        console.log('Actual image dimensions:', {
+          width: img.naturalWidth,
+          height: img.naturalHeight
+        });
+        resolve({
+          width: img.naturalWidth,
+          height: img.naturalHeight
+        });
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = url;
+      img.crossOrigin = 'anonymous';
+    });
+  };
 
-  // History management
+  // History management.
+  const addToHistory = (canvasState) => {
+    setHistory(prev => {
+      const newHistory = [...prev.slice(0, historyIndex + 1), canvasState];
+      if (newHistory.length > 50) newHistory.shift();
+      return newHistory;
+    });
+    setHistoryIndex(prev => prev + 1);
+  };
+
   const undo = () => {
     if (historyIndex > 0 && canvas) {
-      const newIndex = historyIndex - 1;
-      setHistoryIndex(newIndex);
-      canvas.loadFromJSON(history[newIndex], () => canvas.renderAll());
+      setHistoryIndex(prev => prev - 1);
+      canvas.loadFromJSON(history[historyIndex - 1], () => {
+        canvas.renderAll();
+      });
     }
   };
 
   const redo = () => {
     if (historyIndex < history.length - 1 && canvas) {
-      const newIndex = historyIndex + 1;
-      setHistoryIndex(newIndex);
-      canvas.loadFromJSON(history[newIndex], () => canvas.renderAll());
+      setHistoryIndex(prev => prev + 1);
+      canvas.loadFromJSON(history[historyIndex + 1], () => {
+        canvas.renderAll();
+      });
     }
   };
+
+  // Add this effect to save canvas state before brush size changes
+  useEffect(() => {
+    if (canvas) {
+      setCanvasState(JSON.stringify(canvas.toJSON()));
+    }
+  }, [canvas]);
+
+  // Modify the brush size effect
+  useEffect(() => {
+    if (canvas) {
+      if (canvasState) {
+        canvas.loadFromJSON(canvasState, () => {
+          canvas.freeDrawingBrush.width = brushSize;
+          canvas.renderAll();
+        });
+      } else {
+        canvas.freeDrawingBrush.width = brushSize;
+      }
+    }
+  }, [brushSize, canvas, canvasState]);
 
   const handleModeChange = (newMode) => {
     setMode(newMode);
-    if (canvas?.freeDrawingBrush) {
-      canvas.freeDrawingBrush.color = newMode === 'eraser' ? '#000000' : '#ffffff';
+    if (canvas) {
+      canvas.isDrawingMode = true;
+      canvas.freeDrawingBrush.color = newMode === 'eraser' ? '#2d3748' : '#ffffff';
+      canvas.freeDrawingBrush.opacity = 1;
+      canvas.renderAll();
     }
   };
 
+  // Save functionality.
   const handleSave = async () => {
-    if (!canvas || isSaving) return;
+    if (!canvas || !sessionData) return;
     
     try {
       setIsSaving(true);
       setError(null);
+      const sessionId = window.location.pathname.split('/').pop();
 
-      // Export only the mask drawing (the canvas background is black)
-      const maskData = canvas.toDataURL('image/png');
+      console.log('Creating mask at original dimensions:', { originalWidth: sessionData.width, originalHeight: sessionData.height });
       
-      const response = await fetch(`${WORKER_URL}/api/save-mask`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          sessionId,
-          maskData,
-          prompt
-        })
+      // Create a temporary canvas at original image dimensions
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = sessionData.width;
+      tempCanvas.height = sessionData.height;
+      const ctx = tempCanvas.getContext('2d');
+
+      // Fill with black background (represents unmasked areas)
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, sessionData.width, sessionData.height);
+
+      // Scale factor between editor canvas and original image
+      const scaleX = sessionData.width / dimensions.width;
+      const scaleY = sessionData.height / dimensions.height;
+
+      console.log('Using scale factors:', { scaleX, scaleY });
+
+      // Draw the paths scaled to original dimensions
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      const objects = canvas.getObjects();
+      console.log(`Processing ${objects.length} objects`);
+
+      objects.forEach((obj, index) => {
+        if (obj.type === 'path') {
+          const path = obj.path;
+          if (!path) return;
+
+          ctx.beginPath();
+          path.forEach((cmd) => {
+            if (cmd[0] === 'M') {
+              ctx.moveTo(cmd[1] * scaleX, cmd[2] * scaleY);
+            } else if (cmd[0] === 'L') {
+              ctx.lineTo(cmd[1] * scaleX, cmd[2] * scaleY);
+            } else if (cmd[0] === 'Q') {
+              ctx.quadraticCurveTo(
+                cmd[1] * scaleX, 
+                cmd[2] * scaleY, 
+                cmd[3] * scaleX, 
+                cmd[4] * scaleY
+              );
+            }
+          });
+          
+          ctx.lineWidth = obj.strokeWidth * scaleX;
+          // White for mask, black for erase
+          ctx.strokeStyle = obj.stroke === '#2d3748' ? '#000000' : '#ffffff';
+          ctx.stroke();
+        }
       });
 
-      const data = await response.json();
+      console.log('Finished drawing scaled paths');
+
+      // Get the mask data
+      const maskData = tempCanvas.toDataURL('image/png');
+      tempCanvas.remove();
+
+      console.log('Generated mask data, length:', maskData.length);
+
+      console.log('Sending save request to worker');
+      const response = await fetch(`${WORKER_URL}/api/save-mask`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, maskData, prompt })
+      });
       
+
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to save mask');
+        throw new Error(`Save failed: ${response.statusText}`);
       }
 
-      // Show success notification
+      const result = await response.json();
+      console.log('Save response:', result);
+      
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      // Important: Update these states AFTER we get a successful response
+      setIsSaving(false);
+      setShowSaveSuccess(true);
+      
+      // Show a notification that will auto-close the window
       const notification = document.createElement('div');
       notification.className = 'fixed top-4 right-4 left-4 bg-green-500 text-white p-4 rounded-lg text-center';
       notification.innerHTML = `
@@ -202,24 +400,17 @@ const MaskEditor = () => {
       `;
       document.body.appendChild(notification);
 
-      if (data.shouldClose) {
-        setTimeout(() => window.close(), 3000);
-      }
+      // Auto-close after 3 seconds
+      setTimeout(() => {
+        window.close();
+      }, 3000);
+      
     } catch (error) {
       console.error('Save error:', error);
-      setError(error.message);
-    } finally {
+      setError(`Failed to save mask: ${error.message}`);
       setIsSaving(false);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-gray-900">
-        <div className="text-white">Loading editor...</div>
-      </div>
-    );
-  }
 
   if (error) {
     return (
@@ -227,6 +418,14 @@ const MaskEditor = () => {
         <div className="text-red-500 p-4 bg-gray-800 rounded-lg">
           Error: {error}
         </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-900">
+        <div className="text-white">Loading editor...</div>
       </div>
     );
   }
@@ -253,33 +452,39 @@ const MaskEditor = () => {
         onRedo={redo}
         onSave={handleSave}
         isSaving={isSaving}
+        maskUrl={maskUrl}
+        showSaveSuccess={showSaveSuccess}
+        processingStatus={processingStatus}
       />
-      <div className="flex-1 p-4 flex items-center justify-center relative">
-        {/* Display the original image as a semi-transparent reference */}
-        <img
-          src={sessionData.imageUrl}
-          alt="Original"
-          style={{
-            position: 'absolute',
-            width: dimensions.width,
-            height: dimensions.height,
-            objectFit: 'contain',
-            opacity: 0.3,
-            zIndex: 1,
-          }}
-        />
-        {/* The canvas for mask drawing */}
-        <div
+      <div className="flex-1 p-4 flex items-center justify-center overflow-hidden">
+        <div 
           ref={containerRef}
-          className="bg-gray-800 rounded-lg shadow-lg"
-          style={{
-            position: 'relative',
-            zIndex: 2,
-            width: dimensions.width,
-            height: dimensions.height
+          className="bg-gray-800 rounded-lg shadow-lg overflow-hidden max-w-full max-h-full"
+          style={{ 
+            width: `${dimensions.width}px`,
+            height: `${dimensions.height}px`,
+            transform: 'scale(var(--canvas-scale))',
+            transformOrigin: 'center center'
           }}
         />
       </div>
+      {error && (
+        <div className="fixed bottom-4 left-4 right-4 bg-red-500 text-white p-4 rounded-lg">
+          {error}
+        </div>
+      )}
+      {isSaving && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="bg-gray-800 p-4 rounded-lg text-white">
+            Saving mask...
+          </div>
+        </div>
+      )}
+      {successMessage && (
+        <div className="fixed bottom-4 left-4 right-4 bg-green-500 text-white p-4 rounded-lg text-center">
+          {successMessage}
+        </div>
+      )}
     </div>
   );
 };
