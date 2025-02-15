@@ -64,16 +64,13 @@ const MaskEditor = () => {
       try {
         const response = await fetch(`${WORKER_URL}/api/session/${sessionId}`);
         if (!response.ok) throw new Error('Failed to fetch session');
-        
         const data = await response.json();
         setSessionData(data);
-
         const imageDimensions = await getImageDimensions(data.imageUrl);
         const scaledDimensions = calculateScaledDimensions(
           imageDimensions.width,
           imageDimensions.height
         );
-        
         setDimensions(scaledDimensions);
         setLoading(false);
       } catch (error) {
@@ -86,104 +83,68 @@ const MaskEditor = () => {
     fetchSessionData();
   }, [sessionId]);
 
-  // Initialize canvas with background image
+  // Initialize Fabric canvas for mask drawing (without the background image)
   useLayoutEffect(() => {
     if (!sessionData || !containerRef.current) return;
-
-    // Clean up any existing canvas
+    
+    // Clear any existing canvas
     if (canvasRef.current) {
       containerRef.current.innerHTML = '';
     }
 
-    // Create new canvas element
     const canvasEl = document.createElement('canvas');
     canvasEl.width = dimensions.width;
     canvasEl.height = dimensions.height;
     containerRef.current.appendChild(canvasEl);
     canvasRef.current = canvasEl;
 
-    // Initialize Fabric.js canvas
+    // Create Fabric canvas with a black background
     const fabricCanvas = new fabric.Canvas(canvasEl, {
       isDrawingMode: true,
       width: dimensions.width,
       height: dimensions.height,
-      backgroundColor: '#2d3748'
+      backgroundColor: '#000000'
     });
 
-    // Initialize brush
+    // Set up brush for drawing white strokes (the mask)
     const brush = new fabric.PencilBrush(fabricCanvas);
     brush.color = '#ffffff';
     brush.width = brushSize;
     fabricCanvas.freeDrawingBrush = brush;
 
-    // Load background image
-    fabric.Image.fromURL(sessionData.imageUrl, 
-      (img) => {
-        if (!img) {
-          setError('Failed to load image');
-          return;
-        }
-
-        // Scale image to fit canvas
-        const scaleX = dimensions.width / img.width;
-        const scaleY = dimensions.height / img.height;
-        const scale = Math.min(scaleX, scaleY);
-
-        img.set({
-          scaleX: scale,
-          scaleY: scale,
-          selectable: false,
-          evented: false,
-          left: (dimensions.width - (img.width * scale)) / 2,
-          top: (dimensions.height - (img.height * scale)) / 2
-        });
-
-        fabricCanvas.setBackgroundImage(img, fabricCanvas.renderAll.bind(fabricCanvas));
-        
-        // Save initial state
-        const initialState = JSON.stringify(fabricCanvas.toJSON());
-        setHistory([initialState]);
-        setHistoryIndex(0);
-      },
-      { crossOrigin: 'anonymous' }
-    );
-
-    // Add path creation to history
+    // Initialize history for undo/redo
+    const initialState = JSON.stringify(fabricCanvas.toJSON());
+    setHistory([initialState]);
+    setHistoryIndex(0);
+    
     fabricCanvas.on('path:created', () => {
       const canvasState = JSON.stringify(fabricCanvas.toJSON());
-      addToHistory(canvasState);
+      setHistory(prev => {
+        const newHistory = [...prev.slice(0, historyIndex + 1), canvasState];
+        return newHistory.slice(-50);
+      });
+      setHistoryIndex(prev => prev + 1);
     });
 
     setCanvas(fabricCanvas);
 
-    // Cleanup
     return () => {
       fabricCanvas.dispose();
     };
-  }, [sessionData, dimensions]);
+  }, [sessionData, dimensions, brushSize]);
 
-  // Update brush when size changes
+  // Update brush size when changed
   useEffect(() => {
     if (!canvas?.freeDrawingBrush) return;
     canvas.freeDrawingBrush.width = brushSize;
   }, [brushSize, canvas]);
 
   // History management
-  const addToHistory = (state) => {
-    setHistory(prev => {
-      const newHistory = [...prev.slice(0, historyIndex + 1), state];
-      return newHistory.slice(-50); // Keep last 50 states
-    });
-    setHistoryIndex(prev => prev + 1);
-  };
-
   const undo = () => {
     if (historyIndex > 0 && canvas) {
       const newIndex = historyIndex - 1;
       setHistoryIndex(newIndex);
-      canvas.loadFromJSON(history[newIndex], () => {
-        canvas.renderAll();
-      });
+      canvas.loadFromJSON(history[newIndex], () => canvas.renderAll());
     }
   };
 
@@ -191,16 +152,14 @@ const MaskEditor = () => {
     if (historyIndex < history.length - 1 && canvas) {
       const newIndex = historyIndex + 1;
       setHistoryIndex(newIndex);
-      canvas.loadFromJSON(history[newIndex], () => {
-        canvas.renderAll();
-      });
+      canvas.loadFromJSON(history[newIndex], () => canvas.renderAll());
     }
   };
 
   const handleModeChange = (newMode) => {
     setMode(newMode);
     if (canvas?.freeDrawingBrush) {
-      canvas.freeDrawingBrush.color = newMode === 'eraser' ? '#2d3748' : '#ffffff';
+      canvas.freeDrawingBrush.color = newMode === 'eraser' ? '#000000' : '#ffffff';
     }
   };
 
@@ -211,6 +170,7 @@ const MaskEditor = () => {
       setIsSaving(true);
       setError(null);
 
+      // Export only the mask drawing (the canvas background is black)
       const maskData = canvas.toDataURL('image/png');
       
       const response = await fetch(`${WORKER_URL}/api/save-mask`, {
@@ -231,7 +191,7 @@ const MaskEditor = () => {
         throw new Error(data.error || 'Failed to save mask');
       }
 
-      // Show success message
+      // Show success notification
       const notification = document.createElement('div');
       notification.className = 'fixed top-4 right-4 left-4 bg-green-500 text-white p-4 rounded-lg text-center';
       notification.innerHTML = `
@@ -243,9 +203,7 @@ const MaskEditor = () => {
       document.body.appendChild(notification);
 
       if (data.shouldClose) {
-        setTimeout(() => {
-          window.close();
-        }, 3000);
+        setTimeout(() => window.close(), 3000);
       }
     } catch (error) {
       console.error('Save error:', error);
@@ -296,13 +254,29 @@ const MaskEditor = () => {
         onSave={handleSave}
         isSaving={isSaving}
       />
-      <div className="flex-1 p-4 flex items-center justify-center">
-        <div 
+      <div className="flex-1 p-4 flex items-center justify-center relative">
+        {/* Display the original image as a semi-transparent reference */}
+        <img
+          src={sessionData.imageUrl}
+          alt="Original"
+          style={{
+            position: 'absolute',
+            width: dimensions.width,
+            height: dimensions.height,
+            objectFit: 'contain',
+            opacity: 0.3,
+            zIndex: 1,
+          }}
+        />
+        {/* The canvas for mask drawing */}
+        <div
           ref={containerRef}
           className="bg-gray-800 rounded-lg shadow-lg"
           style={{
-            width: `${dimensions.width}px`,
-            height: `${dimensions.height}px`
+            position: 'relative',
+            zIndex: 2,
+            width: dimensions.width,
+            height: dimensions.height
           }}
         />
       </div>
