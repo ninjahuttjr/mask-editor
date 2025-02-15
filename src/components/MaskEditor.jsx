@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useLayoutEffect } from 'react';
 import { fabric } from 'fabric';
 import Toolbar from './Toolbar';
 import { WORKER_URL } from '../config';
+import InpaintingControls from './InpaintingControls';
 
 // Log when the component loads
 console.log('MaskEditor component loaded');
@@ -28,6 +29,10 @@ const MaskEditor = () => {
   const [processingStatus, setProcessingStatus] = useState(null);
   const [canvasState, setCanvasState] = useState(null);
   const [prompt, setPrompt] = useState('');
+  const [denoise, setDenoise] = useState(0.75);
+  const [steps, setSteps] = useState(30);
+  const [guidance, setGuidance] = useState(7.5);
+  const [scheduler, setScheduler] = useState('karras');
 
   // First effect: Fetch session data
   useEffect(() => {
@@ -298,25 +303,39 @@ const MaskEditor = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          sessionId: sessionId,
+          sessionId,
           maskData: maskDataUrl,
-          // The worker will get these from the stored session
-          // discordUserId, channelId, messageId, and metadata
+          prompt,
+          parameters: {
+            denoise,
+            steps,
+            guidance,
+            scheduler
+          }
         }),
       });
 
-      if (!response.ok) throw new Error('Failed to save mask');
+      if (!response.ok) {
+        throw new Error('Failed to save mask');
+      }
 
       setShowSaveSuccess(true);
       
-      // Close window after brief delay to show success state
+      // Set success message and attempt to close
+      setSuccessMessage('Save successful! You can close this window.');
+      
+      // Attempt to close after delay
       setTimeout(() => {
-        window.close();
-      }, 1000);
+        try {
+          window.close();
+        } catch (err) {
+          console.log('Could not close window automatically');
+        }
+      }, 2000);
 
     } catch (error) {
       console.error('Error saving mask:', error);
-      setError('Failed to save mask');
+      setError(error.message);
     } finally {
       setIsSaving(false);
     }
@@ -342,15 +361,18 @@ const MaskEditor = () => {
 
   return (
     <div className="flex flex-col h-screen bg-gray-900">
-      <div className="bg-gray-800 p-4">
-        <input
-          type="text"
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Enter prompt for inpainting..."
-          className="w-full p-2 rounded bg-gray-700 text-white"
-        />
-      </div>
+      <InpaintingControls
+        prompt={prompt}
+        setPrompt={setPrompt}
+        denoise={denoise}
+        setDenoise={setDenoise}
+        steps={steps}
+        setSteps={setSteps}
+        guidance={guidance}
+        setGuidance={setGuidance}
+        scheduler={scheduler}
+        setScheduler={setScheduler}
+      />
       <Toolbar
         mode={mode}
         onModeChange={handleModeChange}
