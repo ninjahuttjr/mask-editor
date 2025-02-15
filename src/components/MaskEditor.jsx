@@ -142,7 +142,7 @@ const MaskEditor = () => {
       isDrawingMode: true,
       width: dimensions.width,
       height: dimensions.height,
-      backgroundColor: '#000000'
+      backgroundColor: '#000000'  // Black background
     });
 
     // Configure brush for binary masking
@@ -175,7 +175,7 @@ const MaskEditor = () => {
     fabricCanvas.on('object:modified', handleHistoryChange);
     fabricCanvas.on('object:removed', handleHistoryChange);
 
-    // Load image
+    // Load image as a template but make it invisible in final output
     fabric.Image.fromURL(
       sessionData.imageUrl,
       (img) => {
@@ -196,19 +196,31 @@ const MaskEditor = () => {
           selectable: false,
           evented: false,
           left: (dimensions.width - (img.width * scale)) / 2,
-          top: (dimensions.height - (img.height * scale)) / 2
+          top: (dimensions.height - (img.height * scale)) / 2,
+          opacity: 0.3  // Make the image semi-transparent as a guide
         });
 
-        fabricCanvas.setBackgroundImage(img, () => {
+        fabricCanvas.add(img);
+        fabricCanvas.renderAll();
+
+        // Add event handler for saving mask
+        const handleSave = async () => {
+          // Temporarily hide the template image
+          img.opacity = 0;
           fabricCanvas.renderAll();
-          console.log('Background image set');
           
-          // Save initial state to history
-          const initialState = JSON.stringify(fabricCanvas.toJSON());
-          addToHistory(initialState);
+          // Get the mask data
+          const maskData = fabricCanvas.toDataURL();
           
-          setLoading(false);
-        });
+          // Restore the template image opacity for continued editing
+          img.opacity = 0.3;
+          fabricCanvas.renderAll();
+          
+          return maskData;
+        };
+
+        // Attach the handleSave function to your save button/logic
+        // ... your existing save logic ...
       },
       { crossOrigin: 'anonymous' }
     );
