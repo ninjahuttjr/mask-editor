@@ -283,118 +283,41 @@ const MaskEditor = () => {
 
   // Save functionality.
   const handleSave = async () => {
-    if (!canvas || !sessionData) return;
+    if (!canvas) return;
     
+    setIsSaving(true);
     try {
-      setIsSaving(true);
-      setError(null);
-      const sessionId = window.location.pathname.split('/').pop();
-
-      console.log('Creating mask at original dimensions:', { originalWidth: sessionData.width, originalHeight: sessionData.height });
-      
-      // Create a temporary canvas at original image dimensions
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = sessionData.width;
-      tempCanvas.height = sessionData.height;
-      const ctx = tempCanvas.getContext('2d');
-
-      // Fill with black background (represents unmasked areas)
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(0, 0, sessionData.width, sessionData.height);
-
-      // Scale factor between editor canvas and original image
-      const scaleX = sessionData.width / dimensions.width;
-      const scaleY = sessionData.height / dimensions.height;
-
-      console.log('Using scale factors:', { scaleX, scaleY });
-
-      // Draw the paths scaled to original dimensions
-      ctx.fillStyle = '#ffffff';
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-
-      const objects = canvas.getObjects();
-      console.log(`Processing ${objects.length} objects`);
-
-      objects.forEach((obj, index) => {
-        if (obj.type === 'path') {
-          const path = obj.path;
-          if (!path) return;
-
-          ctx.beginPath();
-          path.forEach((cmd) => {
-            if (cmd[0] === 'M') {
-              ctx.moveTo(cmd[1] * scaleX, cmd[2] * scaleY);
-            } else if (cmd[0] === 'L') {
-              ctx.lineTo(cmd[1] * scaleX, cmd[2] * scaleY);
-            } else if (cmd[0] === 'Q') {
-              ctx.quadraticCurveTo(
-                cmd[1] * scaleX, 
-                cmd[2] * scaleY, 
-                cmd[3] * scaleX, 
-                cmd[4] * scaleY
-              );
-            }
-          });
-          
-          ctx.lineWidth = obj.strokeWidth * scaleX;
-          // White for mask, black for erase
-          ctx.strokeStyle = obj.stroke === '#2d3748' ? '#000000' : '#ffffff';
-          ctx.stroke();
-        }
+      const maskDataUrl = canvas.toDataURL({
+        format: 'png',
+        quality: 1
       });
-
-      console.log('Finished drawing scaled paths');
-
-      // Get the mask data
-      const maskData = tempCanvas.toDataURL('image/png');
-      tempCanvas.remove();
-
-      console.log('Generated mask data, length:', maskData.length);
-
-      console.log('Sending save request to worker');
+      
       const response = await fetch(`${WORKER_URL}/api/save-mask`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, maskData, prompt })
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          sessionId: sessionId,
+          maskData: maskDataUrl,
+          // The worker will get these from the stored session
+          // discordUserId, channelId, messageId, and metadata
+        }),
       });
-      
 
-      if (!response.ok) {
-        throw new Error(`Save failed: ${response.statusText}`);
-      }
+      if (!response.ok) throw new Error('Failed to save mask');
 
-      const result = await response.json();
-      console.log('Save response:', result);
-      
-      if (result.error) {
-        throw new Error(result.error);
-      }
-
-      // Important: Update these states AFTER we get a successful response
-      setIsSaving(false);
       setShowSaveSuccess(true);
       
-      // Show a notification that will auto-close the window
-      const notification = document.createElement('div');
-      notification.className = 'fixed top-4 right-4 left-4 bg-green-500 text-white p-4 rounded-lg text-center';
-      notification.innerHTML = `
-        <div class="flex flex-col gap-2">
-          <div>Mask saved successfully! Processing will continue in Discord...</div>
-          <div class="text-sm">This window will close in 3 seconds</div>
-        </div>
-      `;
-      document.body.appendChild(notification);
-
-      // Auto-close after 3 seconds
+      // Close window after brief delay to show success state
       setTimeout(() => {
         window.close();
-      }, 3000);
-      
+      }, 1000);
+
     } catch (error) {
-      console.error('Save error:', error);
-      setError(`Failed to save mask: ${error.message}`);
+      console.error('Error saving mask:', error);
+      setError('Failed to save mask');
+    } finally {
       setIsSaving(false);
     }
   };
