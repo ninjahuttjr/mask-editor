@@ -3,6 +3,7 @@ import { fabric } from 'fabric';
 import Toolbar from './Toolbar';
 import { WORKER_URL } from '../config';
 import InpaintingControls from './InpaintingControls';
+import { useParams } from 'react-router-dom';
 
 // Log when the component loads
 console.log('MaskEditor component loaded');
@@ -20,7 +21,7 @@ const MaskEditor = () => {
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
   const [error, setError] = useState(null);
-  const sessionId = window.location.pathname.split('/').pop();
+  const { sessionId } = useParams();
   const [sessionData, setSessionData] = useState(null);
   const [dimensions, setDimensions] = useState({ width: 512, height: 512 });
   const [maskUrl, setMaskUrl] = useState(null);
@@ -349,6 +350,15 @@ const MaskEditor = () => {
       setIsSaving(false);
     }
   };
+
+  // Add validation
+  useEffect(() => {
+    if (!sessionId) {
+      setError('No session ID provided');
+      return;
+    }
+    console.log('Using session ID:', sessionId);
+  }, [sessionId]);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-2 md:p-4">
