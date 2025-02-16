@@ -155,23 +155,23 @@ const MaskEditor = () => {
       isDrawingMode: true,
       width: dimensions.width,
       height: dimensions.height,
-      backgroundColor: '#000000'  // Black background
+      backgroundColor: '#000000'
     });
 
-    // Configure brush for binary masking
+    // Configure brush for binary masking with full opacity
     const brush = new fabric.PencilBrush(fabricCanvas);
-    brush.color = mode === 'eraser' ? '#000000' : '#ffffff';  // White for mask, black for eraser
+    brush.color = mode === 'eraser' ? '#000000' : '#ffffff';
     brush.width = brushSize;
-    brush.opacity = 1;
+    brush.opacity = 1; // Ensure full opacity for binary mask
     fabricCanvas.freeDrawingBrush = brush;
 
-    // Ensure paths are created with correct colors
+    // Ensure paths are created with correct colors and full opacity
     fabricCanvas.on('path:created', (e) => {
       const path = e.path;
       path.set({
         opacity: 1,
         strokeWidth: brushSize,
-        stroke: mode === 'eraser' ? '#000000' : '#ffffff'  // White for mask, black for eraser
+        stroke: mode === 'eraser' ? '#000000' : '#ffffff'
       });
       fabricCanvas.renderAll();
       const canvasState = JSON.stringify(fabricCanvas.toJSON());
@@ -319,8 +319,21 @@ const MaskEditor = () => {
       setIsSaving(true);
       setError(null);
 
+      // Temporarily hide the template image before saving
+      const templateImage = canvas.getObjects('image')[0];
+      if (templateImage) {
+        templateImage.opacity = 0;
+        canvas.renderAll();
+      }
+
       // Get canvas data
       const maskDataUrl = canvasRef.current.toDataURL('image/png');
+
+      // Restore template image visibility
+      if (templateImage) {
+        templateImage.opacity = 0.3;
+        canvas.renderAll();
+      }
 
       // Prepare save data with all parameters
       const saveData = {
