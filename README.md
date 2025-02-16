@@ -25,6 +25,14 @@ Mask Editor is a web-based tool built with React that allows you to create and e
 
 <img width="1224" alt="image" src="https://github.com/user-attachments/assets/6aaa8814-7fb5-45bd-94f6-9f395c6382b3" />
 
+<img width="1059" alt="image" src="https://github.com/user-attachments/assets/dce4c6e0-7ea1-46ba-9825-5d5f36fedbab" />
+
+![image](https://github.com/user-attachments/assets/ea60725c-1cba-4700-b581-24bf58eec980)
+
+
+
+
+
 
 ## Getting Started
 
