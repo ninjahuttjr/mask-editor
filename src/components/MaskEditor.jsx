@@ -351,8 +351,70 @@ const MaskEditor = () => {
   };
 
   return (
-    <div>
-      {/* Rest of the component JSX code */}
+    <div className="min-h-screen bg-gray-900 text-white p-2 md:p-4">
+      {loading ? (
+        <div className="flex items-center justify-center h-screen">
+          <div className="text-white">Loading editor...</div>
+        </div>
+      ) : (
+        <div className="max-w-6xl mx-auto space-y-2">
+          {error && (
+            <div className="bg-red-500 text-white p-4 rounded-lg">
+              {error}
+            </div>
+          )}
+          
+          {showSaveSuccess && (
+            <div className="bg-green-500 text-white p-4 rounded-lg">
+              {successMessage}
+            </div>
+          )}
+
+          <div className="flex flex-col md:grid md:grid-cols-3 gap-4">
+            <div className="md:col-span-2">
+              <div 
+                ref={containerRef}
+                className="relative w-full bg-gray-800 rounded-lg overflow-hidden"
+                style={{
+                  aspectRatio: dimensions.width / dimensions.height,
+                  maxHeight: '70vh'
+                }}
+              />
+              
+              <Toolbar
+                mode={mode}
+                setMode={handleModeChange}
+                brushSize={brushSize}
+                setBrushSize={setBrushSize}
+                onSave={handleSave}
+                onUndo={undo}
+                onRedo={redo}
+                canUndo={historyIndex > 0}
+                canRedo={historyIndex < history.length - 1}
+                isSaving={isSaving}
+                showSaveSuccess={showSaveSuccess}
+                processingStatus={processingStatus}
+                canvas={canvas}
+              />
+            </div>
+
+            <div className="inpainting-controls">
+              <InpaintingControls
+                prompt={prompt}
+                setPrompt={setPrompt}
+                denoise={denoise}
+                setDenoise={setDenoise}
+                steps={steps}
+                setSteps={setSteps}
+                guidance={guidance}
+                setGuidance={setGuidance}
+                scheduler={scheduler}
+                setScheduler={setScheduler}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
