@@ -197,7 +197,7 @@ async function handleGetSession(request, env, corsHeaders) {
 async function handleSaveMask(request, env, corsHeaders) {
   try {
     const data = await request.json();
-    console.log('Received save mask request for session:', data.sessionId);
+    console.log('Received save mask request:', data);
     
     if (!data.maskData) {
       throw new Error('No mask data provided');
@@ -211,12 +211,7 @@ async function handleSaveMask(request, env, corsHeaders) {
       bytes[i] = binaryString.charCodeAt(i);
     }
 
-    if (bytes.length === 0) {
-      throw new Error('Empty mask data received');
-    }
-
     const maskPath = `masks/${data.sessionId}.png`;
-    console.log('Saving mask to:', maskPath, 'Size:', bytes.length);
     
     // Save the mask image
     await env.IMAGE_BUCKET.put(maskPath, bytes, {
@@ -226,84 +221,64 @@ async function handleSaveMask(request, env, corsHeaders) {
       },
     });
 
-    // Verify the saved mask
-    const savedMask = await env.IMAGE_BUCKET.get(maskPath);
-    if (!savedMask || savedMask.size === 0) {
-      throw new Error('Failed to verify saved mask');
+    // Get session data for metadata
+    const sessionStr = await env.SESSIONS.get(data.sessionId);
+    if (!sessionStr) {
+      throw new Error('Session not found');
     }
+    const session = JSON.parse(sessionStr);
 
-    const maskUrl = `${new URL(request.url).origin}/storage/${maskPath}`;
-    console.log('Generated mask URL:', maskUrl, 'Size:', savedMask.size);
-
-    // If any required field is missing, look up the stored session
-    if (!data.discordUserId || !data.channelId || !data.messageId || !data.metadata) {
-      const sessionStr = await env.SESSIONS.get(data.sessionId);
-      if (sessionStr) {
-         const session = JSON.parse(sessionStr);
-         // Our session stored these keys as sent by the bot (in snake_case)
-         data.discordUserId = data.discordUserId || session.discordUserId;
-         data.channelId = data.channelId || session.channelId;
-         data.messageId = data.messageId || session.messageId;
-         data.metadata = data.metadata || session.metadata;
-      }
-    }
-
-    // Validate required fields
-    const missing = [];
-    if (!data.discordUserId) missing.push("discordUserId");
-    if (!data.channelId) missing.push("channelId");
-    if (!data.messageId) missing.push("messageId");
-    if (!data.metadata || !data.metadata.original_url) missing.push("metadata.original_url");
-    if (missing.length > 0) {
-      throw new Error(`Missing required fields: ${missing.join(", ")}`);
-    }
-
-    // Validate and clamp parameters with defaults
+    // Validate and normalize parameters
     const parameters = {
-      denoise: Math.max(0.1, Math.min(1, data.parameters?.denoise || 0.75)),
-      steps: Math.max(10, Math.min(50, data.parameters?.steps || 30)),
-      guidance: Math.max(1, Math.min(20, data.parameters?.guidance || 7.5)),
-      scheduler: ['karras', 'euler_a', 'euler', 'ddim'].includes(data.parameters?.scheduler) 
-        ? data.parameters.scheduler 
-        : 'karras'
+      denoise: parseFloat(data.parameters?.denoise) || 0.75,
+      steps: parseInt(data.parameters?.steps) || 30,
+      guidance: parseFloat(data.parameters?.guidance) || 7.5,
+      scheduler: data.parameters?.scheduler || 'karras',
+      brushSize: parseInt(data.parameters?.brushSize) || 30
     };
 
-    console.log('Using validated parameters:', parameters);
+    // Clamp values to valid ranges
+    parameters.denoise = Math.max(0.1, Math.min(1.0, parameters.denoise));
+    parameters.steps = Math.max(10, Math.min(50, parameters.steps));
+    parameters.guidance = Math.max(1.0, Math.min(20.0, parameters.guidance));
+    parameters.brushSize = Math.max(1, Math.min(100, parameters.brushSize));
 
-    // Send webhook to Discord bot
+    console.log('Validated parameters:', parameters);
+
+    const webhookPayload = {
+      sessionId: data.sessionId,
+      maskUrl: `${new URL(request.url).origin}/storage/${maskPath}`,
+      prompt: data.prompt || "",
+      parameters: data.parameters,
+      metadata: {
+        ...session.metadata,
+        original_url: session.metadata?.original_url
+      },
+      discordUserId: session.discordUserId,
+      channelId: session.channelId,
+      messageId: session.messageId
+    };
+
+    console.log('Sending webhook payload:', webhookPayload);
+
     if (env.DISCORD_BOT_WEBHOOK_URL) {
-      const webhookPayload = {
-        sessionId: data.sessionId,
-        maskUrl: maskUrl,
-        prompt: data.prompt || "",
-        parameters: parameters,  // Use validated parameters
-        metadata: data.metadata,
-        discordUserId: data.discordUserId,
-        channelId: data.channelId,
-        messageId: data.messageId,
-        status: {
-          type: 'inpainting_started',
-          message: 'Inpainting request received, processing will begin shortly...'
-        }
-      };
-
-      console.log('Sending webhook with payload:', webhookPayload);
-
       const webhookResponse = await fetch(env.DISCORD_BOT_WEBHOOK_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(webhookPayload),
+        body: JSON.stringify(webhookPayload)
       });
 
       if (!webhookResponse.ok) {
-        console.error('Webhook failed:', await webhookResponse.text());
+        const errorText = await webhookResponse.text();
+        console.error('Webhook failed:', errorText);
         throw new Error('Failed to send webhook');
       }
     }
 
     return new Response(JSON.stringify({
       status: 'success',
-      maskUrl,
+      maskUrl: webhookPayload.maskUrl,
+      parameters: parameters
     }), {
       headers: {
         'Content-Type': 'application/json',

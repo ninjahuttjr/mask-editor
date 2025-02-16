@@ -150,26 +150,26 @@ const MaskEditor = () => {
     // Initialize Fabric canvas with black background
     const fabricCanvas = new fabric.Canvas(canvasEl, {
       isDrawingMode: true,
-      backgroundColor: '#000000',
+      backgroundColor: '#000000',  // Black background
       width: dimensions.width,
       height: dimensions.height,
-      preserveObjectStacking: true // Important for mask layering
+      preserveObjectStacking: true
     });
 
     // Configure brush for binary masking
     const brush = new fabric.PencilBrush(fabricCanvas);
-    brush.color = mode === 'eraser' ? '#000000' : '#ffffff';
+    brush.color = mode === 'eraser' ? '#000000' : '#ffffff';  // Pure black/white
     brush.width = brushSize;
-    brush.opacity = 1; // Force full opacity for binary mask
+    brush.opacity = 1;  // Force full opacity for binary mask
     fabricCanvas.freeDrawingBrush = brush;
 
     // Ensure paths are created with correct binary properties
     fabricCanvas.on('path:created', (e) => {
       const path = e.path;
       path.set({
-        opacity: 1, // Force full opacity
+        opacity: 1,  // Force full opacity
         strokeWidth: brushSize,
-        stroke: mode === 'eraser' ? '#000000' : '#ffffff'
+        stroke: mode === 'eraser' ? '#000000' : '#ffffff'  // Pure black/white
       });
       fabricCanvas.renderAll();
     });
@@ -272,60 +272,57 @@ const MaskEditor = () => {
 
   // Save functionality.
   const handleSave = async () => {
-    if (isSaving) return;
+    if (!canvas) return;
+    
+    setIsSaving(true);
+    setError(null);
     
     try {
-      setIsSaving(true);
-      setError(null);
+      // Get the canvas data as PNG
+      const maskData = canvas.toDataURL({
+        format: 'png',
+        quality: 1
+      });
 
-      // Temporarily hide the template image before saving
-      const templateImage = canvas.getObjects('image')[0];
-      if (templateImage) {
-        templateImage.opacity = 0;
-        canvas.renderAll();
-      }
-
-      // Get canvas data using the Fabric.js canvas instance
-      const maskDataUrl = canvas.toDataURL('image/png');
-
-      // Restore template image visibility
-      if (templateImage) {
-        templateImage.opacity = 0.3;
-        canvas.renderAll();
-      }
-
-      // Prepare save data with all parameters
-      const saveData = {
-        sessionId: sessionData.id,
-        maskData: maskDataUrl,
-        prompt,
-        parameters: {
-          denoise,
-          steps,
-          guidance,
-          scheduler
-        },
-        metadata: sessionData.metadata
+      // Prepare the parameters object
+      const parameters = {
+        prompt: prompt,
+        denoise: denoise,
+        steps: steps,
+        guidance: guidance,
+        scheduler: scheduler,
+        brushSize: brushSize
       };
 
-      console.log('Saving mask with parameters:', saveData.parameters);
+      console.log('Sending parameters:', parameters);
 
+      // Send to worker
       const response = await fetch(`${WORKER_URL}/api/save-mask`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(saveData)
+        body: JSON.stringify({
+          sessionId: sessionId,
+          maskData: maskData,
+          parameters: parameters  // Include parameters in request
+        }),
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to save mask: ${response.statusText}`);
+        throw new Error(`Failed to save mask: ${await response.text()}`);
       }
 
-      const result = await response.json();
-      setMaskUrl(result.maskUrl);
+      const data = await response.json();
+      setMaskUrl(data.maskUrl);
       setShowSaveSuccess(true);
-      setSuccessMessage('Mask saved successfully! Processing will begin shortly...');
+      setSuccessMessage('Mask saved successfully! Processing your edit...');
+
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setShowSaveSuccess(false);
+        setSuccessMessage(null);
+      }, 3000);
 
     } catch (err) {
       console.error('Error saving mask:', err);
@@ -372,7 +369,11 @@ const MaskEditor = () => {
           <div className="md:col-span-2">
             <div 
               ref={containerRef}
-              className="w-full aspect-square bg-gray-800 rounded-lg"
+              className="relative w-full h-full flex items-center justify-center bg-gray-800 rounded-lg overflow-hidden"
+              style={{
+                aspectRatio: '1 / 1',
+                maxHeight: '80vh'  // Prevent it from being too tall
+              }}
             />
             
             <Toolbar

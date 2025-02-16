@@ -1,18 +1,17 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Brush, Eraser, Undo2, Redo2, Save } from 'lucide-react';
 
 const Toolbar = ({
   mode,
-  onModeChange,
+  setMode,
   brushSize,
-  onBrushSizeChange,
-  canUndo,
-  canRedo,
+  setBrushSize,
+  onSave,
   onUndo,
   onRedo,
-  onSave,
+  canUndo,
+  canRedo,
   isSaving,
-  maskUrl,
   showSaveSuccess,
   processingStatus
 }) => {
@@ -23,6 +22,14 @@ const Toolbar = ({
     } catch (err) {
       console.error('Failed to copy:', err);
       alert('Failed to copy URL');
+    }
+  };
+
+  const handleBrushSizeChange = (newSize) => {
+    const size = parseInt(newSize);
+    setBrushSize(Math.max(1, Math.min(100, size)));
+    if (canvas && canvas.freeDrawingBrush) {
+      canvas.freeDrawingBrush.width = size;
     }
   };
 
@@ -64,14 +71,14 @@ const Toolbar = ({
     <div className="flex items-center gap-4 p-4 bg-gray-800">
       <button
         className={`p-2 rounded ${mode === 'brush' ? 'bg-blue-500' : 'bg-gray-700'}`}
-        onClick={() => onModeChange('brush')}
+        onClick={() => setMode('brush')}
       >
         <Brush className="w-6 h-6" />
       </button>
       
       <button
         className={`p-2 rounded ${mode === 'eraser' ? 'bg-blue-500' : 'bg-gray-700'}`}
-        onClick={() => onModeChange('eraser')}
+        onClick={() => setMode('eraser')}
       >
         <Eraser className="w-6 h-6" />
       </button>
@@ -83,7 +90,7 @@ const Toolbar = ({
           min="1"
           max="100"
           value={brushSize}
-          onChange={(e) => onBrushSizeChange(Number(e.target.value))}
+          onChange={(e) => handleBrushSizeChange(e.target.value)}
           className="w-32"
         />
         <span>{brushSize}px</span>
