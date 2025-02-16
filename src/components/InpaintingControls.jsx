@@ -14,10 +14,10 @@ const InpaintingControls = ({
   setScheduler
 }) => {
   const schedulerOptions = [
-    { value: 'karras', label: 'Karras (Best Quality)' },
-    { value: 'euler_a', label: 'Euler Ancestral' },
-    { value: 'euler', label: 'Euler' },
-    { value: 'ddim', label: 'DDIM' }
+    { value: 'normal', label: 'Normal (Default)' },
+    { value: 'simple', label: 'Simple' },
+    { value: 'ddim_uniform', label: 'DDIM Uniform' },
+    { value: 'exponential', label: 'Exponential' }
   ];
 
   const handleDenoiseChange = (e) => {

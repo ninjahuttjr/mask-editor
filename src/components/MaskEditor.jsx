@@ -34,7 +34,7 @@ const MaskEditor = () => {
   const [denoise, setDenoise] = useState(0.75);
   const [steps, setSteps] = useState(30);
   const [guidance, setGuidance] = useState(7.5);
-  const [scheduler, setScheduler] = useState('karras');
+  const [scheduler, setScheduler] = useState('normal');
 
   // Log parameter changes
   useEffect(() => {
@@ -304,13 +304,13 @@ const MaskEditor = () => {
         quality: 1
       });
 
-      // Prepare the parameters object
+      // Prepare the parameters object with updated defaults
       const parameters = {
         prompt: prompt,
         denoise: denoise,
         steps: steps,
         guidance: guidance,
-        scheduler: scheduler,
+        scheduler: 'normal',  // Changed from 'karras' to 'normal'
         brushSize: brushSize
       };
 
@@ -325,7 +325,7 @@ const MaskEditor = () => {
         body: JSON.stringify({
           sessionId: sessionId,
           maskData: maskData,
-          parameters: parameters  // Include parameters in request
+          parameters: parameters
         }),
       });
 
@@ -338,7 +338,6 @@ const MaskEditor = () => {
       setShowSaveSuccess(true);
       setSuccessMessage('Mask saved successfully! Processing your edit...');
 
-      // Clear success message after 3 seconds
       setTimeout(() => {
         setShowSaveSuccess(false);
         setSuccessMessage(null);
