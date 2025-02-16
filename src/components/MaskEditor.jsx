@@ -140,6 +140,9 @@ const MaskEditor = () => {
     canvasEl.width = dimensions.width;
     canvasEl.height = dimensions.height;
     
+    // Set the ref
+    canvasRef.current = canvasEl;
+    
     // Clear container and add new canvas
     containerRef.current.innerHTML = '';
     containerRef.current.appendChild(canvasEl);
@@ -282,8 +285,8 @@ const MaskEditor = () => {
         canvas.renderAll();
       }
 
-      // Get canvas data
-      const maskDataUrl = canvasRef.current.toDataURL('image/png');
+      // Get canvas data using the Fabric.js canvas instance
+      const maskDataUrl = canvas.toDataURL('image/png');
 
       // Restore template image visibility
       if (templateImage) {
