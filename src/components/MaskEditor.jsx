@@ -131,119 +131,74 @@ const MaskEditor = () => {
     return { width: newWidth, height: newHeight };
   };
 
-  // Use layout effect to initialize canvas after DOM updates
-  useLayoutEffect(() => {
-    if (!sessionData || !containerRef.current || !dimensions.width || !dimensions.height) {
-      console.log('Waiting for all required data...');
-      return;
-    }
+  // Initialize canvas
+  useEffect(() => {
+    if (!sessionData || !containerRef.current) return;
 
-    console.log('Initializing canvas with dimensions:', dimensions);
-    
+    // Create new canvas element with specific dimensions
     const canvasEl = document.createElement('canvas');
     canvasEl.width = dimensions.width;
     canvasEl.height = dimensions.height;
-    canvasEl.style.width = `${dimensions.width}px`;
-    canvasEl.style.height = `${dimensions.height}px`;
-    canvasEl.className = 'rounded-lg';
     
+    // Clear container and add new canvas
     containerRef.current.innerHTML = '';
     containerRef.current.appendChild(canvasEl);
-    canvasRef.current = canvasEl;
 
+    // Initialize Fabric canvas with black background
     const fabricCanvas = new fabric.Canvas(canvasEl, {
       isDrawingMode: true,
+      backgroundColor: '#000000',
       width: dimensions.width,
       height: dimensions.height,
-      backgroundColor: '#000000'
+      preserveObjectStacking: true // Important for mask layering
     });
 
-    // Configure brush for binary masking with full opacity
+    // Configure brush for binary masking
     const brush = new fabric.PencilBrush(fabricCanvas);
     brush.color = mode === 'eraser' ? '#000000' : '#ffffff';
     brush.width = brushSize;
-    brush.opacity = 1; // Ensure full opacity for binary mask
+    brush.opacity = 1; // Force full opacity for binary mask
     fabricCanvas.freeDrawingBrush = brush;
 
-    // Ensure paths are created with correct colors and full opacity
+    // Ensure paths are created with correct binary properties
     fabricCanvas.on('path:created', (e) => {
       const path = e.path;
       path.set({
-        opacity: 1,
+        opacity: 1, // Force full opacity
         strokeWidth: brushSize,
         stroke: mode === 'eraser' ? '#000000' : '#ffffff'
       });
       fabricCanvas.renderAll();
-      const canvasState = JSON.stringify(fabricCanvas.toJSON());
-      addToHistory(canvasState);
     });
 
-    // Handle undo/redo state
-    const handleHistoryChange = () => {
-      const canvasState = JSON.stringify(fabricCanvas.toJSON());
-      addToHistory(canvasState);
-    };
+    // Load template image with proper positioning
+    fabric.Image.fromURL(sessionData.imageUrl, (img) => {
+      if (!img) return;
 
-    fabricCanvas.on('object:added', handleHistoryChange);
-    fabricCanvas.on('object:modified', handleHistoryChange);
-    fabricCanvas.on('object:removed', handleHistoryChange);
+      const scale = Math.min(
+        dimensions.width / img.width,
+        dimensions.height / img.height
+      );
 
-    // Load image as a template but make it invisible in final output
-    fabric.Image.fromURL(
-      sessionData.imageUrl,
-      (img) => {
-        if (!img) {
-          console.error('Failed to load image');
-          setError('Failed to load image');
-          setLoading(false);
-          return;
-        }
+      img.set({
+        scaleX: scale,
+        scaleY: scale,
+        left: (dimensions.width - (img.width * scale)) / 2,
+        top: (dimensions.height - (img.height * scale)) / 2,
+        selectable: false,
+        evented: false,
+        opacity: 0.3, // Reduced opacity for better mask visibility
+        objectCaching: false // Important for proper rendering
+      });
 
-        const scaleX = dimensions.width / img.width;
-        const scaleY = dimensions.height / img.height;
-        const scale = Math.min(scaleX, scaleY);
-        
-        img.set({
-          scaleX: scale,
-          scaleY: scale,
-          selectable: false,
-          evented: false,
-          left: (dimensions.width - (img.width * scale)) / 2,
-          top: (dimensions.height - (img.height * scale)) / 2,
-          opacity: 0.3  // Make the image semi-transparent as a guide
-        });
-
-        fabricCanvas.add(img);
-        fabricCanvas.renderAll();
-
-        // Add event handler for saving mask
-        const handleSave = async () => {
-          // Temporarily hide the template image
-          img.opacity = 0;
-          fabricCanvas.renderAll();
-          
-          // Get the mask data
-          const maskData = fabricCanvas.toDataURL();
-          
-          // Restore the template image opacity for continued editing
-          img.opacity = 0.3;
-          fabricCanvas.renderAll();
-          
-          return maskData;
-        };
-
-        // Attach the handleSave function to your save button/logic
-        // ... your existing save logic ...
-      },
-      { crossOrigin: 'anonymous' }
-    );
+      fabricCanvas.add(img);
+      fabricCanvas.renderAll();
+    }, { crossOrigin: 'anonymous' });
 
     setCanvas(fabricCanvas);
 
-    return () => {
-      fabricCanvas.dispose();
-    };
-  }, [sessionData, dimensions, brushSize, mode]);
+    return () => fabricCanvas.dispose();
+  }, [sessionData, dimensions]);
 
   // Utility function to get image dimensions
   const getImageDimensions = (url) => {
@@ -301,12 +256,13 @@ const MaskEditor = () => {
     }
   }, [brushSize, canvas, mode]);
 
+  // Handle mode changes with proper binary settings
   const handleModeChange = (newMode) => {
     setMode(newMode);
     if (canvas) {
       canvas.isDrawingMode = true;
       canvas.freeDrawingBrush.color = newMode === 'eraser' ? '#000000' : '#ffffff';
-      canvas.freeDrawingBrush.opacity = 1;
+      canvas.freeDrawingBrush.opacity = 1; // Maintain binary nature
       canvas.renderAll();
     }
   };
