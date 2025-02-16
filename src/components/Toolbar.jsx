@@ -13,7 +13,8 @@ const Toolbar = ({
   canRedo,
   isSaving,
   showSaveSuccess,
-  processingStatus
+  processingStatus,
+  canvas
 }) => {
   const copyToClipboard = async () => {
     try {

@@ -397,7 +397,7 @@ const MaskEditor = () => {
             
             <Toolbar
               mode={mode}
-              setMode={setMode}
+              setMode={handleModeChange}
               brushSize={brushSize}
               setBrushSize={setBrushSize}
               onSave={handleSave}
@@ -406,6 +406,7 @@ const MaskEditor = () => {
               canUndo={historyIndex > 0}
               canRedo={historyIndex < history.length - 1}
               isSaving={isSaving}
+              canvas={canvas}
             />
           </div>
 
