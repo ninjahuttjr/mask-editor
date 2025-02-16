@@ -371,8 +371,8 @@ const MaskEditor = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-4">
-      <div className="max-w-6xl mx-auto space-y-4">
+    <div className="min-h-screen bg-gray-900 text-white p-4 discord-embed">
+      <div className="max-w-6xl mx-auto space-y-2">
         {error && (
           <div className="bg-red-500 text-white p-4 rounded-lg">
             {error}
@@ -391,8 +391,8 @@ const MaskEditor = () => {
               ref={containerRef}
               className="relative w-full h-full flex items-center justify-center bg-gray-800 rounded-lg overflow-hidden"
               style={{
-                aspectRatio: '1 / 1',
-                maxHeight: '80vh'  // Prevent it from being too tall
+                aspectRatio: dimensions.width / dimensions.height,
+                maxHeight: '70vh'  // Slightly smaller for better mobile fit
               }}
             />
             
