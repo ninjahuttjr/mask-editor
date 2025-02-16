@@ -150,26 +150,46 @@ const MaskEditor = () => {
     // Initialize Fabric canvas with black background
     const fabricCanvas = new fabric.Canvas(canvasEl, {
       isDrawingMode: true,
-      backgroundColor: '#000000',  // Black background
+      backgroundColor: '#000000',
       width: dimensions.width,
       height: dimensions.height,
-      preserveObjectStacking: true
+      preserveObjectStacking: true,
+      enableRetinaScaling: true,
+      renderOnAddRemove: true,
+      selection: false
     });
 
-    // Configure brush for binary masking
+    // Configure brush for better precision
     const brush = new fabric.PencilBrush(fabricCanvas);
-    brush.color = mode === 'eraser' ? '#000000' : '#ffffff';  // Pure black/white
+    brush.color = mode === 'eraser' ? '#000000' : '#ffffff';
     brush.width = brushSize;
-    brush.opacity = 1;  // Force full opacity for binary mask
+    brush.opacity = 1;
+    brush.strokeLineCap = 'round';
+    brush.strokeLineJoin = 'round';
+    brush.strokeMiterLimit = 4;
+    brush.decimate = 2;
+
     fabricCanvas.freeDrawingBrush = brush;
 
-    // Ensure paths are created with correct binary properties
+    // Add this event listener for better brush responsiveness
+    fabricCanvas.on('mouse:move', (event) => {
+      if (fabricCanvas.isDrawing) {
+        fabricCanvas.renderAll();
+      }
+    });
+
+    // Improve path creation handling
     fabricCanvas.on('path:created', (e) => {
       const path = e.path;
       path.set({
-        opacity: 1,  // Force full opacity
+        opacity: 1,
         strokeWidth: brushSize,
-        stroke: mode === 'eraser' ? '#000000' : '#ffffff'  // Pure black/white
+        stroke: mode === 'eraser' ? '#000000' : '#ffffff',
+        strokeLineCap: 'round',
+        strokeLineJoin: 'round',
+        strokeMiterLimit: 4,
+        selectable: false,
+        evented: false
       });
       fabricCanvas.renderAll();
     });
