@@ -28,11 +28,24 @@ const MaskEditor = () => {
   const [successMessage, setSuccessMessage] = useState(null);
   const [processingStatus, setProcessingStatus] = useState(null);
   const [canvasState, setCanvasState] = useState(null);
+  
+  // Inpainting parameters state
   const [prompt, setPrompt] = useState('');
   const [denoise, setDenoise] = useState(0.75);
   const [steps, setSteps] = useState(30);
   const [guidance, setGuidance] = useState(7.5);
   const [scheduler, setScheduler] = useState('karras');
+
+  // Log parameter changes
+  useEffect(() => {
+    console.log('Parameters updated:', { 
+      prompt,
+      denoise, 
+      steps, 
+      guidance, 
+      scheduler 
+    });
+  }, [prompt, denoise, steps, guidance, scheduler]);
 
   // First effect: Fetch session data
   useEffect(() => {
@@ -300,45 +313,51 @@ const MaskEditor = () => {
 
   // Save functionality.
   const handleSave = async () => {
-    if (!canvas) return;
+    if (isSaving) return;
     
-    setIsSaving(true);
     try {
-      const maskDataUrl = canvas.toDataURL({
-        format: 'png',
-        quality: 1
-      });
-      
+      setIsSaving(true);
+      setError(null);
+
+      // Get canvas data
+      const maskDataUrl = canvasRef.current.toDataURL('image/png');
+
+      // Prepare save data with all parameters
+      const saveData = {
+        sessionId: sessionData.id,
+        maskData: maskDataUrl,
+        prompt,
+        parameters: {
+          denoise,
+          steps,
+          guidance,
+          scheduler
+        },
+        metadata: sessionData.metadata
+      };
+
+      console.log('Saving mask with parameters:', saveData.parameters);
+
       const response = await fetch(`${WORKER_URL}/api/save-mask`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          sessionId,
-          maskData: maskDataUrl,
-          prompt,
-          parameters: {
-            denoise,
-            steps,
-            guidance,
-            scheduler
-          }
-        }),
+        body: JSON.stringify(saveData)
       });
 
       if (!response.ok) {
-        throw new Error('Failed to save mask');
+        throw new Error(`Failed to save mask: ${response.statusText}`);
       }
 
+      const result = await response.json();
+      setMaskUrl(result.maskUrl);
       setShowSaveSuccess(true);
-      
-      // Close window immediately after successful save
-      window.close();
+      setSuccessMessage('Mask saved successfully! Processing will begin shortly...');
 
-    } catch (error) {
-      console.error('Error saving mask:', error);
-      setError('Failed to save mask: ' + error.message);
+    } catch (err) {
+      console.error('Error saving mask:', err);
+      setError(err.message);
     } finally {
       setIsSaving(false);
     }
@@ -363,63 +382,57 @@ const MaskEditor = () => {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-900">
-      <InpaintingControls
-        prompt={prompt}
-        setPrompt={setPrompt}
-        denoise={denoise}
-        setDenoise={setDenoise}
-        steps={steps}
-        setSteps={setSteps}
-        guidance={guidance}
-        setGuidance={setGuidance}
-        scheduler={scheduler}
-        setScheduler={setScheduler}
-      />
-      <Toolbar
-        mode={mode}
-        onModeChange={handleModeChange}
-        brushSize={brushSize}
-        onBrushSizeChange={setBrushSize}
-        canUndo={historyIndex > 0}
-        canRedo={historyIndex < history.length - 1}
-        onUndo={undo}
-        onRedo={redo}
-        onSave={handleSave}
-        isSaving={isSaving}
-        maskUrl={maskUrl}
-        showSaveSuccess={showSaveSuccess}
-        processingStatus={processingStatus}
-      />
-      <div className="flex-1 p-4 flex items-center justify-center overflow-hidden">
-        <div 
-          ref={containerRef}
-          className="bg-gray-800 rounded-lg shadow-lg overflow-hidden max-w-full max-h-full"
-          style={{ 
-            width: `${dimensions.width}px`,
-            height: `${dimensions.height}px`,
-            transform: 'scale(var(--canvas-scale))',
-            transformOrigin: 'center center'
-          }}
-        />
-      </div>
-      {error && (
-        <div className="fixed bottom-4 left-4 right-4 bg-red-500 text-white p-4 rounded-lg">
-          {error}
-        </div>
-      )}
-      {isSaving && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-gray-800 p-4 rounded-lg text-white">
-            Saving mask...
+    <div className="min-h-screen bg-gray-900 text-white p-4">
+      <div className="max-w-6xl mx-auto space-y-4">
+        {error && (
+          <div className="bg-red-500 text-white p-4 rounded-lg">
+            {error}
+          </div>
+        )}
+        
+        {showSaveSuccess && (
+          <div className="bg-green-500 text-white p-4 rounded-lg">
+            {successMessage}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="md:col-span-2">
+            <div 
+              ref={containerRef}
+              className="w-full aspect-square bg-gray-800 rounded-lg"
+            />
+            
+            <Toolbar
+              mode={mode}
+              setMode={setMode}
+              brushSize={brushSize}
+              setBrushSize={setBrushSize}
+              onSave={handleSave}
+              onUndo={undo}
+              onRedo={redo}
+              canUndo={historyIndex > 0}
+              canRedo={historyIndex < history.length - 1}
+              isSaving={isSaving}
+            />
+          </div>
+
+          <div className="space-y-4">
+            <InpaintingControls
+              prompt={prompt}
+              setPrompt={setPrompt}
+              denoise={denoise}
+              setDenoise={setDenoise}
+              steps={steps}
+              setSteps={setSteps}
+              guidance={guidance}
+              setGuidance={setGuidance}
+              scheduler={scheduler}
+              setScheduler={setScheduler}
+            />
           </div>
         </div>
-      )}
-      {successMessage && (
-        <div className="fixed bottom-4 left-4 right-4 bg-green-500 text-white p-4 rounded-lg text-center">
-          {successMessage}
-        </div>
-      )}
+      </div>
     </div>
   );
 };
