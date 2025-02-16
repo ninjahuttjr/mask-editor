@@ -1,1 +1,2 @@
-export const WORKER_URL = 'https://proud-sky-f006.2qzyhk4jvk.workers.dev';
+// config.js
+export const WORKER_URL = process.env.REACT_APP_WORKER_URL || 'https://fallback-url-if-not-set.workers.dev';
