@@ -191,7 +191,12 @@ const MaskEditor = () => {
         selectable: false,
         evented: false
       });
-      fabricCanvas.renderAll();
+      
+      // Save state for undo/redo after each path
+      const jsonData = canvas.toJSON();
+      addToHistory(jsonData);
+      
+      canvas.renderAll();
     });
 
     // Load template image with proper positioning
@@ -210,7 +215,7 @@ const MaskEditor = () => {
         top: (dimensions.height - (img.height * scale)) / 2,
         selectable: false,
         evented: false,
-        opacity: 0.3, // Reduced opacity for better mask visibility
+        opacity: 0.7, // Increased from 0.3 for better visibility
         objectCaching: false // Important for proper rendering
       });
 
@@ -273,11 +278,13 @@ const MaskEditor = () => {
 
   // Modify brush size without reloading canvas state
   useEffect(() => {
-    if (canvas && canvas.freeDrawingBrush) {
-      canvas.freeDrawingBrush.width = brushSize;
-      canvas.freeDrawingBrush.color = mode === 'eraser' ? '#000000' : '#ffffff';
+    if (canvas) {
+      const brush = canvas.freeDrawingBrush;
+      brush.width = brushSize;
+      brush.color = mode === 'eraser' ? '#000000' : '#ffffff';
+      canvas.renderAll();
     }
-  }, [brushSize, canvas, mode]);
+  }, [brushSize, mode, canvas]);
 
   // Handle mode changes with proper binary settings
   const handleModeChange = (newMode) => {
@@ -370,7 +377,7 @@ const MaskEditor = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-4 discord-embed">
+    <div className="min-h-screen bg-gray-900 text-white p-2 md:p-4">
       <div className="max-w-6xl mx-auto space-y-2">
         {error && (
           <div className="bg-red-500 text-white p-4 rounded-lg">
@@ -384,14 +391,14 @@ const MaskEditor = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="flex flex-col md:grid md:grid-cols-3 gap-4">
           <div className="md:col-span-2">
             <div 
               ref={containerRef}
-              className="relative w-full h-full flex items-center justify-center bg-gray-800 rounded-lg overflow-hidden"
+              className="relative w-full bg-gray-800 rounded-lg overflow-hidden"
               style={{
                 aspectRatio: dimensions.width / dimensions.height,
-                maxHeight: '70vh'  // Slightly smaller for better mobile fit
+                maxHeight: '70vh'
               }}
             />
             
@@ -410,7 +417,7 @@ const MaskEditor = () => {
             />
           </div>
 
-          <div className="space-y-4">
+          <div className="inpainting-controls">
             <InpaintingControls
               prompt={prompt}
               setPrompt={setPrompt}

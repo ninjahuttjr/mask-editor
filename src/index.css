@@ -44,6 +44,51 @@ body {
     width: 100% !important;
     height: 30px;
   }
+  
+  .grid-cols-1 {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .canvas-container {
+    width: 100% !important;
+    height: auto !important;
+    max-height: 60vh !important;
+  }
+  
+  /* Improve controls visibility */
+  .inpainting-controls {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(17, 24, 39, 0.95);
+    padding: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    max-height: 40vh;
+    overflow-y: auto;
+    backdrop-filter: blur(10px);
+  }
+  
+  /* Make sliders more touch-friendly */
+  input[type="range"] {
+    height: 24px;
+    margin: 1rem 0;
+  }
+  
+  /* Improve toolbar spacing */
+  .toolbar-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+  
+  /* Make buttons more touch-friendly */
+  button {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0.75rem !important;
+  }
 }
 
 /* Discord embed optimization */
