@@ -3,7 +3,6 @@ import { fabric } from 'fabric';
 import Toolbar from './Toolbar';
 import { WORKER_URL } from '../config';
 import InpaintingControls from './InpaintingControls';
-import { useParams } from 'react-router-dom';
 
 // Log when the component loads
 console.log('MaskEditor component loaded');
@@ -21,7 +20,7 @@ const MaskEditor = () => {
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
   const [error, setError] = useState(null);
-  const { sessionId } = useParams();
+  const sessionId = window.location.pathname.split('/').pop();
   const [sessionData, setSessionData] = useState(null);
   const [dimensions, setDimensions] = useState({ width: 512, height: 512 });
   const [maskUrl, setMaskUrl] = useState(null);
@@ -310,42 +309,48 @@ const MaskEditor = () => {
         quality: 1
       });
 
-      // Prepare the parameters object
+      // Prepare the parameters object with updated defaults
       const parameters = {
         prompt: prompt,
         denoise: denoise,
         steps: steps,
         guidance: guidance,
-        scheduler: scheduler,
+        scheduler: 'normal',  // Changed from 'karras' to 'normal'
         brushSize: brushSize
       };
 
       console.log('Sending parameters:', parameters);
 
-      // Send to worker
-      const response = await fetch(`${WORKER_URL}/api/session/${sessionId}/mask`, {
+      // Send to worker with updated endpoint
+      const response = await fetch(`${WORKER_URL}/api/save-mask`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          mask: maskData,
+          sessionId: sessionId,
+          maskData: maskData,
           parameters: parameters
-        })
+        }),
       });
 
       if (!response.ok) {
         throw new Error(`Failed to save mask: ${await response.text()}`);
       }
 
-      const result = await response.json();
+      const data = await response.json();
+      setMaskUrl(data.maskUrl);
       setShowSaveSuccess(true);
-      setSuccessMessage("Mask saved successfully!");
-      setTimeout(() => setShowSaveSuccess(false), 3000);
-      
-    } catch (error) {
-      console.error('Save failed:', error);
-      setError(error.message);
+      setSuccessMessage('Mask saved successfully! Processing your edit...');
+
+      setTimeout(() => {
+        setShowSaveSuccess(false);
+        setSuccessMessage(null);
+      }, 3000);
+
+    } catch (err) {
+      console.error('Error saving mask:', err);
+      setError(err.message);
     } finally {
       setIsSaving(false);
     }
