@@ -32,7 +32,7 @@ const InpaintingControls = ({
 
   const handleGuidanceChange = (e) => {
     const value = parseFloat(e.target.value);
-    setGuidance(Math.max(1, Math.min(20, value)));
+    setGuidance(Math.max(1, Math.min(30, value)));
   };
 
   return (
@@ -110,7 +110,7 @@ const InpaintingControls = ({
           <div className="group relative">
             <Info className="w-4 h-4 text-gray-400 cursor-help" />
             <div className="hidden group-hover:block absolute left-0 top-6 w-64 p-2 bg-gray-700 text-sm text-white rounded-lg shadow-lg z-50">
-              How closely to follow the prompt. Higher values mean more literal interpretation.
+              Controls how closely the result matches your prompt
             </div>
           </div>
         </div>
@@ -118,13 +118,13 @@ const InpaintingControls = ({
           <input
             type="range"
             min="1"
-            max="20"
+            max="30"
             step="0.5"
             value={guidance}
             onChange={handleGuidanceChange}
             className="w-full"
           />
-          <span className="text-sm">{guidance.toFixed(1)}</span>
+          <span className="text-sm text-white">{guidance.toFixed(1)}</span>
         </div>
       </div>
 

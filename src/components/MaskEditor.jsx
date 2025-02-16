@@ -31,9 +31,9 @@ const MaskEditor = () => {
   
   // Inpainting parameters state
   const [prompt, setPrompt] = useState('');
-  const [denoise, setDenoise] = useState(0.75);
-  const [steps, setSteps] = useState(30);
-  const [guidance, setGuidance] = useState(7.5);
+  const [denoise, setDenoise] = useState(0.85);
+  const [steps, setSteps] = useState(28);
+  const [guidance, setGuidance] = useState(30);
   const [scheduler, setScheduler] = useState('normal');
 
   // Log parameter changes

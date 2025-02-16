@@ -89,7 +89,6 @@ async function handleStartSession(request, env, corsHeaders) {
       throw new Error("Invalid image data received");
     }
 
-    // Use dimensions from request or defaults
     const dimensions = {
       width: data.width || 512,
       height: data.height || 512
@@ -109,14 +108,13 @@ async function handleStartSession(request, env, corsHeaders) {
       },
     });
 
-    // Store session with dimensions and extra fields
     const session = {
       id: sessionId,
       imagePath,
       width: dimensions.width,
       height: dimensions.height,
       createdAt: Date.now(),
-      discordUserId: data.discord_user_id,  // Note: our bot sends these in snake_case
+      discordUserId: data.discord_user_id,
       channelId: data.channel_id,
       messageId: data.message_id,
       metadata: data.metadata || {},
@@ -229,18 +227,20 @@ async function handleSaveMask(request, env, corsHeaders) {
     const session = JSON.parse(sessionStr);
 
     // Validate and normalize parameters
+    // In handleSaveMask function, update the default parameters
     const parameters = {
-      denoise: parseFloat(data.parameters?.denoise) || 0.75,
-      steps: parseInt(data.parameters?.steps) || 30,
-      guidance: parseFloat(data.parameters?.guidance) || 7.5,
-      scheduler: data.parameters?.scheduler || 'karras',
+      prompt: data.parameters?.prompt || "",
+      denoise: parseFloat(data.parameters?.denoise) || 0.85,  // Changed from 0.75
+      steps: parseInt(data.parameters?.steps) || 28,          // Changed from 30
+      guidance: parseFloat(data.parameters?.guidance) || 30,   // Changed from 7.5
+      scheduler: data.parameters?.scheduler || 'normal',       // Changed from 'karras'
       brushSize: parseInt(data.parameters?.brushSize) || 30
     };
 
-    // Clamp values to valid ranges
+    // Update the parameter clamping ranges
     parameters.denoise = Math.max(0.1, Math.min(1.0, parameters.denoise));
     parameters.steps = Math.max(10, Math.min(50, parameters.steps));
-    parameters.guidance = Math.max(1.0, Math.min(20.0, parameters.guidance));
+    parameters.guidance = Math.max(1.0, Math.min(30.0, parameters.guidance));  // Updated max to 30
     parameters.brushSize = Math.max(1, Math.min(100, parameters.brushSize));
 
     console.log('Validated parameters:', parameters);
@@ -248,8 +248,8 @@ async function handleSaveMask(request, env, corsHeaders) {
     const webhookPayload = {
       sessionId: data.sessionId,
       maskUrl: `${new URL(request.url).origin}/storage/${maskPath}`,
-      prompt: data.prompt || "",
-      parameters: data.parameters,
+      prompt: parameters.prompt,  // Use prompt from parameters
+      parameters: parameters,
       metadata: {
         ...session.metadata,
         original_url: session.metadata?.original_url
